@@ -1,0 +1,12 @@
+# Only the settings this project changes from Supabase defaults.
+project_id = "brain-dump"
+
+[functions.process-dump]
+verify_jwt = true
+
+# Called by the database cron job, which checks its own secret instead of a login token.
+[functions.nudge]
+verify_jwt = false
+
+[functions.plan-today]
+verify_jwt = true
