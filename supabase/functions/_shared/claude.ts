@@ -29,7 +29,7 @@ function withImages(text: string, images: DumpImage[]) {
   ];
 }
 
-const OUTPUT_TYPES = ["slides", "notes", "email", "document", "checklist"] as const;
+const OUTPUT_TYPES = ["slides", "notes", "email", "document", "checklist", "recipe", "content"] as const;
 const FOLDER_KINDS = ["class", "project", "general"] as const;
 
 const Sorted = z.object({
@@ -86,6 +86,8 @@ const SORT_SYSTEM = `You are the organising brain behind a brain-dump app for so
 - "email" when a work idea or solution needs to be communicated to someone, or they say they should email or message someone.
 - "document" for a proposal, plan, write-up or longer piece.
 - "checklist" for a step-by-step list (packing, preparing an event, a process).
+- "recipe" when they share a recipe or a dish they want to try (typed, said, a screenshot or photo of a recipe, a video they describe). Always use the folder "Recipes" (folder_kind "general", folder_area "home_family"), title it with the dish name, and put every detail they gave (ingredients, amounts, steps, source) in the brief. No reminder item for a recipe unless they ask for one. If they mention what they already have at home to cook with, keep it as a note in area home_family with the tag "kitchen".
+- "content" for an idea for a TikTok, Instagram reel, post, carousel or story. Use a folder per account or theme if they name one (for example "TikTok: cooking"), else "Social media content" (folder_kind "project", folder_area "personal" unless it is clearly for their career). One output per post idea, titled with the hook or topic, and put the platform, format and every detail they gave in the brief. When they plan several posts or say how often they want to post, also create or update a "checklist" output in the same folder titled "Content calendar" listing each post as "- [ ] <weekday d Mon>: <platform> <format>: <topic>", spaced realistically for someone with two jobs (2 to 4 posts a week unless they say otherwise), with batch filming on a weekend morning; add a reminder item for each filming session and each posting day at a sensible local time.
 Only draft an output when it genuinely saves them work; a simple reminder stays a reminder. If an existing output in the same folder covers the same thing (for example today's class slides), update it rather than creating a duplicate: set update_output_id to its id. For an email, set email_account to "work" for anything about their job, colleagues, clients or projects (it goes to Outlook), or "personal" (Gmail); null for other types. For each output give: a ref you invent ("o1", "o2"), the folder (required, same rules as above), folder_kind ("class" for a class, course or teaching; "project" for work projects; else "general"), folder_area, type, a clear title, and brief: everything from the dump the writer needs, plus what to produce. Big projects with a deadline (a thesis, a launch, an exam, an event, a move): create a folder for it, a "checklist" output titled like "<Project> plan" listing every stage as "- [ ] stage, by <weekday d Mon>" worked back from the deadline with a sensible buffer (about a week before the real deadline), flagging the riskiest or slowest step, and one reminder item per milestone with remind_at at 09:00 local two days before that milestone's date. If such a plan already exists in that folder, update it instead.
 When you draft an email to send later, also add a reminder item ("Send the email to Ahmed about the API fix") for the next working morning at 09:00 local unless they said otherwise, with output_ref pointing at the email.
 
@@ -179,6 +181,8 @@ Format the content as Markdown:
 - email: the email body only, ready to send, short paragraphs, friendly and professional, with a greeting and sign-off. Set email_subject; set email_to to the recipient's name or address if they said who it is for, else null.
 - document: a clear structured write-up with headings.
 - checklist: Markdown task list ("- [ ] step"), grouped under headings if long.
+- content: a ready-to-film plan for one post. Start with a line for platform, format and length (for example "TikTok · talking-head video · 30 to 45 s"). Then "## Hook" (the first 1 to 3 seconds, with 2 alternatives), "## Script" (short spoken lines, or slide-by-slide text for a carousel), "## Shots" (a simple shot list they can film on a phone), "## Caption" (ready to paste, matching their language for that account), "## Hashtags" (5 to 10 relevant ones), and "## Best time to post" (a suggested day and time in their time zone). Keep it in their voice; English, Egyptian Arabic or a mix, following how they speak about that account.
+- recipe: first a line with time, servings and difficulty (for example "⏱ 40 min · 🍽 4 servings · Easy"), then "## Ingredients" as a task list ("- [ ] 500 g chicken breast") so they can tick off shopping, then "## Steps" as a numbered list of short steps, then "## Tips" only if useful, and "Source:" with the link or account if they gave one. Use metric amounts. Keep Arabic dish names, with the English name too.
 Set email_to and email_subject to null for anything that is not an email.
 
 When an existing version is given, produce the complete updated version that merges the new thoughts in, keeping everything still relevant. Attached photos or screenshots are part of their material; use what is in them.
@@ -392,4 +396,53 @@ export async function writeLearning(
   });
   if (response.stop_reason === "refusal" || !response.parsed_output) throw new Error("Could not write learning bite");
   return response.parsed_output;
+}
+
+const Meal = z.object({
+  saved_recipe_id: z.string().nullable(),
+  title: z.string(),
+  teaser: z.string(),
+  why: z.string(),
+  content: z.string().nullable(),
+});
+export type MealIdea = z.infer<typeof Meal>;
+
+const MEAL_SYSTEM = `You suggest what to cook today for a busy person with ADHD in Egypt, who works full time from home, teaches part time and runs a household with their spouse. Deciding what to cook is the hard part, so give one clear answer, not a list of options.
+
+Pick from their saved recipes when one fits: favour recipes they saved but have not tried yet ("want to try"), especially on weekends or lighter days, and avoid anything cooked in the last week. Otherwise suggest a simple home-cooked meal: Egyptian and Middle Eastern home cooking mixed with easy international dishes, always halal, and quick (about 40 minutes or less) on workdays. Use what they said they have at home when given. Vary proteins and cuisines across days; never repeat a recent meal.
+
+saved_recipe_id: the id of the saved recipe you chose, or null. title: the dish name (Arabic name plus English when it is an Egyptian dish). teaser: one line under 90 characters for a notification. why: one short sentence on why this one today. content: null when you chose a saved recipe; otherwise the full recipe in Markdown: a line with time, servings and difficulty, "## Ingredients" as a task list with metric amounts, "## Steps" numbered and short.`;
+
+export async function writeMeal(
+  saved: { id: string; title: string; tried: boolean }[],
+  recentMeals: string[],
+  kitchenNotes: string[],
+  now: Date,
+  timeZone: string,
+  weekend: boolean,
+  aboutMe = "",
+): Promise<MealIdea> {
+  const localNow = new Intl.DateTimeFormat("en-GB", { timeZone, dateStyle: "full", timeStyle: "short" }).format(now);
+  const response = await client.beta.messages.parse({
+    model: MODEL,
+    max_tokens: 8000,
+    ...FALLBACK,
+    output_config: { effort: "low", format: betaZodOutputFormat(Meal) },
+    system: MEAL_SYSTEM,
+    messages: [
+      {
+        role: "user",
+        content:
+          `Local time: ${localNow} (${weekend ? "weekend" : "workday"}).\n` +
+          `Saved recipes: ${JSON.stringify(saved)}\n` +
+          `Cooked or suggested recently (avoid): ${recentMeals.join("; ") || "nothing yet"}\n` +
+          `What they said they have at home: ${kitchenNotes.join("; ") || "unknown"}` +
+          aboutBlock(aboutMe),
+      },
+    ],
+  });
+  if (response.stop_reason === "refusal" || !response.parsed_output) throw new Error("Could not suggest a meal");
+  const idea = response.parsed_output;
+  if (idea.saved_recipe_id && !saved.some((r) => r.id === idea.saved_recipe_id)) idea.saved_recipe_id = null;
+  return idea;
 }

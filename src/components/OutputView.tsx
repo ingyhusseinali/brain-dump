@@ -8,10 +8,11 @@ interface Props {
   folderName: string | null;
   onClose: () => void;
   onDone: () => void;
+  onCooked?: () => void;
 }
 
 /** Full-screen view of one draft: a slide presenter, an email ready to send, or a document. */
-export function OutputView({ output, folderName, onClose, onDone }: Props) {
+export function OutputView({ output, folderName, onClose, onDone, onCooked }: Props) {
   const [copied, setCopied] = useState(false);
   const [presenting, setPresenting] = useState(false);
 
@@ -67,9 +68,14 @@ export function OutputView({ output, folderName, onClose, onDone }: Props) {
           <button className="pill" onClick={() => void copy()}>
             {copied ? "Copied ✓" : "Copy"}
           </button>
-          {output.status !== "done" && (
+          {output.type === "recipe" && onCooked && (
+            <button className="primary" onClick={onCooked}>
+              {output.last_cooked_on ? "Cooked it again 🍳" : "I cooked it 🍳"}
+            </button>
+          )}
+          {output.status !== "done" && output.type !== "recipe" && (
             <button className="pill quiet" onClick={onDone}>
-              {output.type === "email" ? "I sent it" : output.type === "learning" ? "Read it ✓" : "Done with this"}
+              {output.type === "email" ? "I sent it" : output.type === "learning" ? "Read it ✓" : output.type === "content" ? "Posted it ✓" : "Done with this"}
             </button>
           )}
         </div>

@@ -47,7 +47,7 @@ export function Today({ brain, today, library, profileState, highlightId, onOpen
 
   // Drafts Claude made in the last few days that haven't been used yet.
   const ready = library.outputs
-    .filter((o) => o.status === "draft" && Date.now() - Date.parse(o.updated_at) < 3 * 86_400_000)
+    .filter((o) => o.status === "draft" && o.type !== "recipe" && Date.now() - Date.parse(o.updated_at) < 3 * 86_400_000)
     .slice(0, 3);
   const folderName = (id: string | null) => library.folders.find((f) => f.id === id)?.name ?? null;
 
@@ -142,7 +142,7 @@ export function Today({ brain, today, library, profileState, highlightId, onOpen
         )}
       </section>
 
-      <Daily state={profileState} />
+      <Daily state={profileState} outputs={library.outputs} onOpenOutput={onOpenOutput} />
     </div>
   );
 }

@@ -223,6 +223,22 @@ export function Settings({ state, email }: { state: ReturnType<typeof useProfile
           </section>
 
           <section className="card">
+            <h2>Cooking</h2>
+            <Toggle
+              label="Tell me what to cook each day"
+              hint="One idea a day, from recipes you saved or something simple. Save a recipe by dumping it, a screenshot or a link."
+              checked={profile.cooking_daily}
+              onChange={(v) => void save({ cooking_daily: v })}
+            />
+            {profile.cooking_daily && (
+              <label className="field">
+                Suggest at
+                <input type="time" value={toTime(profile.cooking_minute)} onChange={(e) => void save({ cooking_minute: fromTime(e.target.value) })} />
+              </label>
+            )}
+          </section>
+
+          <section className="card">
             <h2>Cycle</h2>
             <Toggle
               label="Track my cycle"

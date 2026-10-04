@@ -10,3 +10,6 @@ verify_jwt = false
 
 [functions.plan-today]
 verify_jwt = true
+
+[functions.suggest-meal]
+verify_jwt = true

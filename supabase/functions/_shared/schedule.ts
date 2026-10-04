@@ -75,6 +75,11 @@ export function localMinutes(at: Date, timeZone: string): number {
   return localParts(at, timeZone).minutes;
 }
 
+/** Whether today is one of this person's weekend days, in their time zone. */
+export function isWeekend(weekendDays: number[], now: Date, timeZone: string): boolean {
+  return weekendDays.includes(localParts(now, timeZone).day);
+}
+
 /** When this person's day starts today, in minutes after local midnight. */
 export function dayStart(profile: Profile, now: Date): number {
   const { day } = localParts(now, profile.timezone);

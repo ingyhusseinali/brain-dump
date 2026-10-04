@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { CalculationMethod, Coordinates, PrayerTimes } from "adhan";
 import type { useProfile } from "../lib/profile";
+import type { Output } from "../lib/library";
 import { timeZone } from "../lib/supabase";
 import { daysBetween, fertileWindow, localDate, onPeriod } from "../../supabase/functions/_shared/schedule";
 
@@ -27,9 +28,10 @@ const fmtDay = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(undef
 const fmtTime = (d: Date) => d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
 /** Quran, prayer and cycle: small, calm cards that need one tap at most. */
-export function Daily({ state }: { state: ProfileState }) {
-  const { profile, cycles, markQuranRead, logPeriod } = state;
+export function Daily({ state, outputs, onOpenOutput }: { state: ProfileState; outputs: Output[]; onOpenOutput: (id: string) => void }) {
+  const { profile, cycles, markQuranRead, logPeriod, suggestMeal } = state;
   const [, tick] = useState(0);
+  const [thinking, setThinking] = useState(false);
   useEffect(() => {
     const t = setInterval(() => tick((n) => n + 1), 60_000);
     return () => clearInterval(t);
@@ -73,6 +75,20 @@ export function Daily({ state }: { state: ProfileState }) {
             </div>
           )}
         </div>
+      )}
+
+      {profile.cooking_daily && (
+        <MealCard
+          meal={profile.last_meal_on === today ? outputs.find((o) => o.id === profile.meal_today_id) ?? null : null}
+          thinking={thinking}
+          onOpen={onOpenOutput}
+          onSuggest={async () => {
+            setThinking(true);
+            const id = await suggestMeal();
+            setThinking(false);
+            if (id) onOpenOutput(id);
+          }}
+        />
       )}
 
       {prayer && (
@@ -125,5 +141,26 @@ export function Daily({ state }: { state: ProfileState }) {
         </div>
       )}
     </section>
+  );
+}
+
+function MealCard({ meal, thinking, onOpen, onSuggest }: { meal: Output | null; thinking: boolean; onOpen: (id: string) => void; onSuggest: () => void }) {
+  return (
+    <div className="daily-card">
+      <div>
+        <p className="daily-title" dir="auto">🍳 {meal ? `Tonight: ${meal.title}` : "What to cook today"}</p>
+        <p className="muted small">{meal ? (meal.last_cooked_on ? "A favourite from your recipes" : "Ingredients and steps inside") : "One clear idea, from your saved recipes or something simple"}</p>
+      </div>
+      <div className="daily-actions">
+        {meal && (
+          <button className="pill" onClick={() => onOpen(meal.id)}>
+            Open
+          </button>
+        )}
+        <button className="pill" disabled={thinking} onClick={onSuggest}>
+          {thinking ? "Thinking…" : meal ? "Something else" : "Decide for me"}
+        </button>
+      </div>
+    </div>
   );
 }

@@ -22,6 +22,10 @@ export interface Profile {
   cycle_tracking: boolean;
   about_me: string;
   study_topics: string;
+  cooking_daily: boolean;
+  cooking_minute: number;
+  last_meal_on: string | null;
+  meal_today_id: string | null;
 }
 
 /** The person's settings and cycle history, shared by Today and Settings. */
@@ -85,5 +89,14 @@ export function useProfile(userId: string) {
     [cycles, load],
   );
 
-  return { profile, cycles, save, markQuranRead, logPeriod };
+  /** Asks Claude what to cook today (again, if they want something else). */
+  const suggestMeal = useCallback(async (): Promise<string | null> => {
+    const { data, error } = await supabase.functions.invoke("suggest-meal", { body: { timezone: timeZone } });
+    if (error || !data?.meal) return null;
+    const today = localDate(new Date(), timeZone);
+    setProfile((p) => (p ? { ...p, last_meal_on: today, meal_today_id: data.meal.outputId } : p));
+    return data.meal.outputId as string;
+  }, []);
+
+  return { profile, cycles, save, markQuranRead, logPeriod, suggestMeal };
 }

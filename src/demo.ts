@@ -45,7 +45,7 @@ const db: Record<string, Row[]> = {
     id: "p1", user_id: USER, timezone: "Africa/Cairo", quiet_start: 22, quiet_end: 7, day_start_weekday: 465, day_start_weekend: 570,
     weekend_days: [6, 0], latitude: 30.04, longitude: 31.24, prayer_reminders: true, prayer_fajr: true, quran_daily: true,
     quran_page: 112, quran_last_read: null, quran_streak: 4, learning_daily: true, learning_minute: 780, cycle_tracking: true,
-    study_topics: "PMP, SAP Activate",
+    study_topics: "PMP, SAP Activate", cooking_daily: true, cooking_minute: 900, last_meal_on: null, meal_today_id: null,
     about_me: "Full-time remote SAP project manager. Part-time university teaching assistant (Information Systems tutorials). Finishing my thesis, deadline 21 Dec. Married. Studying for PMP and SAP Activate.",
   }],
   folders: [
@@ -53,6 +53,8 @@ const db: Record<string, Row[]> = {
     { id: "f2", user_id: USER, name: "SAP rollout project", kind: "project", area: "career", archived: false, updated_at: iso(-14) },
     { id: "f3", user_id: USER, name: "Thesis", kind: "project", area: "education", archived: false, updated_at: iso(-5) },
     { id: "f4", user_id: USER, name: "Daily learning", kind: "general", area: "education", archived: false, updated_at: iso(-3) },
+    { id: "f5", user_id: USER, name: "Recipes", kind: "general", area: "home_family", archived: false, updated_at: iso(-6) },
+    { id: "f6", user_id: USER, name: "TikTok & Instagram", kind: "project", area: "personal", archived: false, updated_at: iso(-4) },
   ],
   outputs: [
     { id: "o1", user_id: USER, folder_id: "f2", type: "email", title: "Fix for the data migration delay", email_account: "work",
@@ -70,8 +72,21 @@ const db: Record<string, Row[]> = {
     { id: "o5", user_id: USER, folder_id: "f4", type: "learning", title: "PMP: the 3 domains in 5 minutes",
       content: "The PMP exam has three domains:\n\n1. **People (42%)**: leading and supporting the team\n2. **Process (50%)**: the technical side of running the project\n3. **Business Environment (8%)**: linking the project to strategy\n\n**Practice question:** A team member keeps missing stand-ups. What do you do first?\n\n<details><summary>Answer</summary>Talk to them privately to understand why. People first, then process.</details>",
       email_to: null, email_subject: null, email_account: null, status: "draft", created_at: iso(-27), updated_at: iso(-27) },
+    { id: "r1", user_id: USER, folder_id: "f5", type: "recipe", title: "Creamy garlic chicken pasta", last_cooked_on: null,
+      content: "⏱ 30 min · 🍽 4 servings · Easy\n\n## Ingredients\n- [ ] 500 g chicken breast, sliced\n- [ ] 400 g penne\n- [ ] 4 cloves garlic, crushed\n- [ ] 250 ml cooking cream\n- [ ] 50 g parmesan, grated\n- [ ] 1 handful spinach\n- [ ] Salt, pepper, paprika\n\n## Steps\n1. Boil the pasta in salted water.\n2. Season the chicken and fry in a little oil until golden, about 6 minutes.\n3. Add garlic for 1 minute, then cream and parmesan.\n4. Stir in spinach until it wilts.\n5. Toss with the pasta and serve.\n\nSource: a reel you saved on Instagram",
+      email_to: null, email_subject: null, email_account: null, status: "draft", created_at: iso(-50), updated_at: iso(-50) },
+    { id: "r2", user_id: USER, folder_id: "f5", type: "recipe", title: "ملوخية بالفراخ (Molokhia with chicken)", last_cooked_on: day(-6),
+      content: "⏱ 1 h 15 min · 🍽 4 servings · Medium\n\n## Ingredients\n- [ ] 1 whole chicken\n- [ ] 400 g frozen minced molokhia\n- [ ] 8 cloves garlic\n- [ ] 1 tbsp ground coriander\n- [ ] 2 tbsp ghee\n- [ ] Onion, cardamom, bay leaves for the broth\n\n## Steps\n1. Boil the chicken with onion, cardamom and bay leaves for 45 minutes. Keep the broth.\n2. Bring 1 litre of broth to a simmer and stir in the molokhia. Don't let it boil hard.\n3. Fry garlic and coriander in ghee until golden (the ta'leya) and pour it in. Gasp optional!\n4. Roast the chicken pieces in the oven until browned.\n5. Serve with rice or bread.",
+      email_to: null, email_subject: null, email_account: null, status: "draft", created_at: iso(-200), updated_at: iso(-140) },
+    { id: "c1", user_id: USER, folder_id: "f6", type: "content", title: "A day in my life: SAP PM, TA and thesis",
+      content: "TikTok + Instagram Reel · day-in-the-life video · 45 to 60 s\n\n## Hook\n- \"I have two jobs and a thesis due in December. Here's how a Sunday actually looks.\"\n- Alt: \"POV: your brain has 47 tabs open\"\n- Alt: \"What an SAP project manager does before 9 am\"\n\n## Script\n1. 7:45 coffee + brain dump into my app (show the phone)\n2. Stand-up call with the project team (laptop shot, no client names)\n3. Lunch break: 10 minutes of thesis edits\n4. Afternoon: preparing tomorrow's tutorial slides\n5. Evening: cooking + one page of Quran\n6. End: \"Done is better than perfect. See you tomorrow.\"\n\n## Shots\n- Close-up of coffee and phone\n- Over-the-shoulder laptop (blur the screen)\n- Hands writing on thesis printout\n- Kitchen pan shot\n\n## Caption\nTwo jobs, one thesis, one ADHD brain. Here's what actually works for me 👇 #dayinmylife\n\n## Hashtags\n#dayinmylife #sap #projectmanager #phdlife #adhd #workingwoman #egypt #productivity\n\n## Best time to post\nThursday 7 pm (Cairo)",
+      email_to: null, email_subject: null, email_account: null, status: "draft", created_at: iso(-4), updated_at: iso(-4) },
+    { id: "c2", user_id: USER, folder_id: "f6", type: "checklist", title: "Content calendar",
+      content: `## This week\n- [ ] ${day(2)}: Instagram carousel: 5 things I wish I knew before my master's\n- [ ] ${day(4)}: TikTok: a day in my life (SAP PM, TA and thesis)\n- [ ] ${day(6)}: Instagram reel: 30-second creamy chicken pasta\n\n## Filming\n- [ ] Saturday 10 am: batch film the day-in-the-life clips and the pasta reel`,
+      email_to: null, email_subject: null, email_account: null, status: "draft", created_at: iso(-4), updated_at: iso(-4) },
   ],
   items: [
+    item("12", { kind: "reminder", area: "personal", title: "Film 2 TikToks (batch session)", folder_id: "f6", remind_at: iso(40) }),
     item("1", { kind: "reminder", area: "career", title: "Send Mariam the migration idea", remind_at: iso(-1), priority: 1, folder_id: "f2", output_id: "o1" }),
     item("2", { area: "education", title: "Rework thesis chapter 3 from the supervisor's comments", priority: 1, folder_id: "f3", remind_at: iso(3) }),
     item("3", { area: "education", title: "Review the ERP slides before Tuesday's tutorial", folder_id: "f1", output_id: "o2" }),
@@ -206,6 +221,8 @@ async function rest(table: string, method: string, params: URLSearchParams, head
 
 const RULES: [RegExp, string, string | null][] = [
   [/class|tutorial|lecture|student|slides|محاضر|سكشن/i, "education", "f1"],
+  [/recipe|cook|dinner|lunch|طبخ|اكل|وصفة/i, "home_family", "f5"],
+  [/tiktok|instagram|reel|post|content|video|تيك|انستا/i, "personal", "f6"],
   [/thesis|chapter|supervisor|dean|رسال/i, "education", "f3"],
   [/sap|client|meeting|email|mariam|project|work|شغل/i, "career", "f2"],
   [/pmp|activate|exam|certif/i, "career", null],
@@ -284,6 +301,14 @@ export function installDemo() {
       return json({ plan });
     }
     if (path === "/functions/v1/process-dump") return json({ ok: true }, 202);
+    if (path === "/functions/v1/suggest-meal") {
+      await new Promise((r) => setTimeout(r, 700));
+      // Alternate between the saved "want to try" recipe and an old favourite.
+      const profile = db.profiles[0];
+      const outputId = profile.meal_today_id === "r1" ? "r2" : "r1";
+      Object.assign(profile, { last_meal_on: new Date().toLocaleDateString("en-CA"), meal_today_id: outputId });
+      return json({ meal: { outputId, title: db.outputs.find((o) => o.id === outputId)?.title, teaser: "", why: "" } });
+    }
     if (path.startsWith("/storage/v1/")) return json({ Key: "demo" });
     if (path === "/auth/v1/user") return json(session.user);
     if (path.startsWith("/auth/v1/")) return json(session);

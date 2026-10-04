@@ -6,6 +6,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.117.2";
 import { sendToUser } from "../_shared/push.ts";
 import { buildPlan } from "../_shared/plan.ts";
 import { processDump } from "../_shared/file.ts";
+import { suggestMeal } from "../_shared/meal.ts";
 import { prayerTimesFor } from "../_shared/prayer.ts";
 import { NUDGE_STYLES, writeLearning, writeNudge } from "../_shared/claude.ts";
 import {
@@ -17,6 +18,7 @@ import {
   dueNudges,
   inPrayerHold,
   inQuietHours,
+  isWeekend,
   localDate,
   localHour,
   localMinutes,
@@ -47,6 +49,9 @@ interface FullProfile extends Profile {
   cycle_tracking: boolean;
   about_me: string;
   study_topics: string;
+  cooking_daily: boolean;
+  cooking_minute: number;
+  last_meal_on: string | null;
   last_fertile_nudge_for: string | null;
 }
 
@@ -185,6 +190,13 @@ async function runForUser(profile: FullProfile, items: Item[], now: Date) {
   if (profile.learning_daily && !holdForPrayer && dailyDue(profile.learning_minute, profile.last_learning_on, profile, now)) {
     await db.from("profiles").update({ last_learning_on: today }).eq("user_id", userId);
     await sendLearningBite(userId, items, now, profile.about_me, profile.study_topics);
+  }
+
+  // What to cook today, early enough to shop or defrost. Skipped if they already asked in the app.
+  if (profile.cooking_daily && !holdForPrayer && dailyDue(profile.cooking_minute, profile.last_meal_on, profile, now)) {
+    await db.from("profiles").update({ last_meal_on: today }).eq("user_id", userId);
+    const meal = await suggestMeal(db, userId, profile.timezone, now, isWeekend(profile.weekend_days, now, profile.timezone));
+    await sendToUser(db, userId, { title: `🍳 Tonight: ${meal.title}`, body: meal.teaser, url: `?output=${meal.outputId}`, tag: "meal" });
   }
 
   // Evening Quran nudge if today's page isn't read yet: after Isha when prayer times are on, else 20:30.

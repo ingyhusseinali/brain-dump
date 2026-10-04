@@ -11,7 +11,7 @@ export interface Folder {
   updated_at: string;
 }
 
-export type OutputType = "slides" | "notes" | "email" | "document" | "checklist" | "learning";
+export type OutputType = "slides" | "notes" | "email" | "document" | "checklist" | "learning" | "recipe" | "content";
 
 export interface Output {
   id: string;
@@ -23,6 +23,7 @@ export interface Output {
   email_subject: string | null;
   email_account: "work" | "personal" | null;
   status: "draft" | "done" | "archived";
+  last_cooked_on?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -80,7 +81,13 @@ export function useLibrary(userId: string) {
     [],
   );
 
-  return { ...lib, refresh, setOutputStatus };
+  /** Recipes stay in the folder; this just remembers when it was last cooked so suggestions vary. */
+  const markCooked = useCallback(async (id: string, on: string) => {
+    setLib((l) => ({ ...l, outputs: l.outputs.map((o) => (o.id === id ? { ...o, last_cooked_on: on } : o)) }));
+    await supabase.from("outputs").update({ last_cooked_on: on }).eq("id", id);
+  }, []);
+
+  return { ...lib, refresh, setOutputStatus, markCooked };
 }
 
 export const OUTPUT_ICON: Record<OutputType, string> = {
@@ -90,6 +97,8 @@ export const OUTPUT_ICON: Record<OutputType, string> = {
   document: "📄",
   checklist: "☑️",
   learning: "🌱",
+  recipe: "🍳",
+  content: "🎬",
 };
 
 export const OUTPUT_LABEL: Record<OutputType, string> = {
@@ -99,6 +108,8 @@ export const OUTPUT_LABEL: Record<OutputType, string> = {
   document: "Document",
   checklist: "Checklist",
   learning: "Today's learning",
+  recipe: "Recipe",
+  content: "Content idea",
 };
 
 /** Slides are stored as Markdown separated by a line containing only ---. */

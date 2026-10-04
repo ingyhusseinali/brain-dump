@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { configured, supabase } from "./lib/supabase";
+import { configured, supabase, timeZone } from "./lib/supabase";
+import { localDate } from "../supabase/functions/_shared/schedule";
 import { registerServiceWorker, serviceWorkers } from "./lib/push";
 import { useBrain } from "./lib/items";
 import { usePlan } from "./lib/plan";
@@ -76,6 +77,10 @@ function SignedIn({ userId, email }: { userId: string; email: string }) {
           void library.setOutputStatus(output.id, "done");
           // "Sent it" also clears the reminder to send it.
           for (const i of brain.items) if (i.output_id === output.id && i.status !== "done") void brain.actions.done(i.id);
+          setOutputId(null);
+        }}
+        onCooked={() => {
+          void library.markCooked(output.id, localDate(new Date(), timeZone));
           setOutputId(null);
         }}
       />
