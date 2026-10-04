@@ -7,7 +7,8 @@ About 20 minutes, once. After that, every push to `main` tests and deploys autom
 1. Create a free project at [supabase.com](https://supabase.com). Save the database password it asks for.
 2. In **Project Settings → API**, note the **Project ref** (the `xxxx` in `https://xxxx.supabase.co`) and the **anon public** key.
 3. In **Account → Access Tokens**, create a token for GitHub to deploy with.
-4. In **Authentication → Email Templates → Magic Link**, make sure the email includes `{{ .Token }}` so it contains a 6-digit code. The app signs in with the code, because iPhone Home Screen apps can't receive magic links.
+
+You sign in with email and password, so no email template changes are needed. The first time, the app sends one confirmation email; tap its link once, then sign in inside the app.
 
 ## 2. Anthropic (Claude)
 

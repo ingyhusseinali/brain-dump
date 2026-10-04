@@ -24,7 +24,7 @@ An ADHD-friendly brain-dump app for phone and laptop. Type or say whatever is in
 | Part | What |
 | --- | --- |
 | App | React + Vite installable web app (PWA), hosted on GitHub Pages |
-| Data, login, sync | Supabase: Postgres with row level security, email-code login, Realtime |
+| Data, login, sync | Supabase: Postgres with row level security, email and password login, Realtime |
 | `process-dump` function | Claude splits a dump into items (life area, time, priority, folder), drafts or updates slides, notes, emails and documents, and marks done what you said you finished. Runs in the background; the `nudge` job retries anything left over |
 | `plan-today` function | Claude writes today's list, adding steps for neglected goals and areas |
 | `nudge` function | Runs every 5 minutes from a database cron job: prayer times, reminders and Claude-written re-nudges, snoozes, morning list at the workday or weekend start, learning bite, evening Quran nudge, fertile-window heads-up, stale-task clean-up |
