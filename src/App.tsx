@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { configured, supabase } from "./lib/supabase";
-import { registerServiceWorker } from "./lib/push";
+import { registerServiceWorker, serviceWorkers } from "./lib/push";
 import { useBrain } from "./lib/items";
 import { usePlan } from "./lib/plan";
 import { useLibrary } from "./lib/library";
@@ -61,8 +61,9 @@ function SignedIn({ userId, email }: { userId: string; email: string }) {
       if (params.get("output")) setOutputId(params.get("output"));
       setView(params.get("view") === "folders" ? "folders" : "today");
     };
-    navigator.serviceWorker?.addEventListener("message", onMessage);
-    return () => navigator.serviceWorker?.removeEventListener("message", onMessage);
+    const workers = serviceWorkers();
+    workers?.addEventListener("message", onMessage);
+    return () => workers?.removeEventListener("message", onMessage);
   }, []);
 
   if (output) {

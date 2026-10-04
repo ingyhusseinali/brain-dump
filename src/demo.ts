@@ -240,7 +240,27 @@ function fileDump(dump: Row) {
 
 export const DEMO_URL = "https://demo.supabase.co";
 
+/** Some embedded viewers block browser storage; fall back to memory so the app still runs. */
+function ensureStorage() {
+  try {
+    localStorage.setItem("brain-dump:probe", "1");
+    localStorage.removeItem("brain-dump:probe");
+  } catch {
+    const data = new Map<string, string>();
+    const memory = {
+      get length() { return data.size; },
+      key: (i: number) => [...data.keys()][i] ?? null,
+      getItem: (k: string) => data.get(k) ?? null,
+      setItem: (k: string, v: string) => void data.set(k, String(v)),
+      removeItem: (k: string) => void data.delete(k),
+      clear: () => data.clear(),
+    };
+    Object.defineProperty(window, "localStorage", { value: memory, configurable: true });
+  }
+}
+
 export function installDemo() {
+  ensureStorage();
   const realFetch = window.fetch.bind(window);
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const req = new Request(input, init);

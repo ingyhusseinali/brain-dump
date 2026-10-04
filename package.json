@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "check:functions": "deno check supabase/functions/*/index.ts",
-    "build:demo": "tsc -b && vite build --outDir dist-demo"
+    "build:demo": "node scripts/build-demo-page.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",

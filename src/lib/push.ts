@@ -12,15 +12,24 @@ export function isStandalone() {
   return window.matchMedia("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true;
 }
 
+/** The service worker container, or null where the browser refuses one (for example inside a sandboxed frame). */
+export function serviceWorkers(): ServiceWorkerContainer | null {
+  try {
+    return navigator.serviceWorker ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function registerServiceWorker() {
-  if (!("serviceWorker" in navigator)) return null;
+  if (!serviceWorkers()) return null;
   return navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL });
 }
 
 export async function pushState(): Promise<PushState> {
   // iPhone only allows notifications for apps added to the Home Screen.
   if (isIos() && !isStandalone()) return "needs-install";
-  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !VAPID_PUBLIC_KEY) return "unsupported";
+  if (!serviceWorkers() || !("PushManager" in window) || !VAPID_PUBLIC_KEY) return "unsupported";
   if (Notification.permission === "denied") return "blocked";
   const reg = await navigator.serviceWorker.getRegistration(import.meta.env.BASE_URL);
   const sub = await reg?.pushManager.getSubscription();
