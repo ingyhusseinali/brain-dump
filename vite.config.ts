@@ -6,5 +6,5 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   base: process.env.BASE_PATH ?? "/",
   plugins: [react()],
-  build: process.env.DEMO_SINGLE_FILE ? { rolldownOptions: { output: { inlineDynamicImports: true } } } : {},
+  build: process.env.DEMO_SINGLE_FILE ? { rolldownOptions: { output: { inlineDynamicImports: true, format: "iife" } } } : {},
 });
