@@ -45,6 +45,7 @@ interface FullProfile extends Profile {
   learning_minute: number;
   last_learning_on: string | null;
   cycle_tracking: boolean;
+  about_me: string;
   last_fertile_nudge_for: string | null;
 }
 
@@ -182,7 +183,7 @@ async function runForUser(profile: FullProfile, items: Item[], now: Date) {
   // Daily learning bite, alternating faith and general knowledge.
   if (profile.learning_daily && !holdForPrayer && dailyDue(profile.learning_minute, profile.last_learning_on, profile, now)) {
     await db.from("profiles").update({ last_learning_on: today }).eq("user_id", userId);
-    await sendLearningBite(userId, items, now);
+    await sendLearningBite(userId, items, now, profile.about_me);
   }
 
   // Evening Quran nudge if today's page isn't read yet: after Isha when prayer times are on, else 20:30.
@@ -220,7 +221,7 @@ async function runForUser(profile: FullProfile, items: Item[], now: Date) {
   }
 }
 
-async function sendLearningBite(userId: string, items: Item[], now: Date) {
+async function sendLearningBite(userId: string, items: Item[], now: Date, aboutMe: string) {
   const dayNumber = Math.floor(now.getTime() / 86_400_000);
   const track = dayNumber % 2 === 0 ? "faith" : "general";
 
@@ -232,7 +233,7 @@ async function sendLearningBite(userId: string, items: Item[], now: Date) {
     .order("created_at", { ascending: false })
     .limit(30);
   const interests = [...new Set(items.filter((i) => i.kind === "goal" || i.kind === "idea").map((i) => i.title))].slice(0, 10);
-  const bite = await writeLearning(track, (recent ?? []).map((r) => r.title), interests, now);
+  const bite = await writeLearning(track, (recent ?? []).map((r) => r.title), interests, now, aboutMe);
 
   let { data: folder } = await db.from("folders").select("id").eq("user_id", userId).ilike("name", "Daily learning").maybeSingle();
   if (!folder) {

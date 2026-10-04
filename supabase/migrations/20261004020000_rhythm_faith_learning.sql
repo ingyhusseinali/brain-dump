@@ -68,3 +68,7 @@ alter publication supabase_realtime add table public.cycles;
 
 alter table public.profiles add column cycle_tracking boolean not null default false;
 alter table public.profiles add column last_fertile_nudge_for date; -- window start already announced
+
+-- What Claude knows about this person's life (jobs, studies, people, commitments).
+-- Grows from what they dump and can be edited in Settings.
+alter table public.profiles add column about_me text not null default '' check (length(about_me) <= 6000);

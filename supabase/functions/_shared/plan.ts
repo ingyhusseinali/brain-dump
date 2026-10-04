@@ -36,6 +36,7 @@ export async function buildPlan(
   }
 
   const since = new Date(now.getTime() - 30 * DAY).toISOString();
+  const { data: profile } = await db.from("profiles").select("about_me").eq("user_id", userId).single();
   const [{ data: open, error }, { data: done }] = await Promise.all([
     db.from("items").select("*").eq("user_id", userId).in("status", ["open", "snoozed"]),
     db
@@ -81,6 +82,7 @@ export async function buildPlan(
     areaActivity,
     now,
     timeZone,
+    profile?.about_me ?? "",
   );
 
   const entries: PlanRow["entries"] = [];

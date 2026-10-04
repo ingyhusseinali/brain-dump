@@ -99,6 +99,19 @@ export function Settings({ state, email }: { state: ReturnType<typeof useProfile
       {profile && (
         <>
           <section className="card">
+            <h2>What I know about you</h2>
+            <p className="muted small">I learn this from what you tell me and use it to sort, plan and write for you. Change anything that's wrong.</p>
+            <textarea
+              className="about"
+              dir="auto"
+              rows={6}
+              defaultValue={profile.about_me}
+              placeholder="Nothing yet. Tell me about your life on the Today page."
+              onBlur={(e) => e.target.value !== profile.about_me && void save({ about_me: e.target.value })}
+            />
+          </section>
+
+          <section className="card">
             <h2>Your day</h2>
             <label className="field">
               Workdays start around

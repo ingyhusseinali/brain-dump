@@ -72,6 +72,15 @@ export function Today({ brain, today, library, profileState, highlightId, onOpen
 
   return (
     <div className="page">
+      {!items.length && !brain.unsorted.length && !plan && !writing && (
+        <section className="welcome">
+          <h1>Hi Ingy 👋</h1>
+          <p>
+            Start by telling me about your life, in English or Arabic, as messy as you like: your work, studies and deadlines, home,
+            family and friends, and anything on your mind. I'll set up your folders and plans from it.
+          </p>
+        </section>
+      )}
       <Capture />
 
       {ready.length > 0 && (

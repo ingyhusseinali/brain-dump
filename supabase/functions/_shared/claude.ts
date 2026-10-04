@@ -12,6 +12,10 @@ const FALLBACK = { betas: ["server-side-fallback-2026-07-01"], fallbacks: "defau
 // Ingy talks in English and Egyptian Arabic, often mixed in one breath.
 const LANGUAGE = `Language: they speak English and Egyptian Arabic (often mixed). Understand both, including Arabic written in Latin letters ("franco"). Anything formal or for work (work emails, work documents, slides and materials for teaching or presenting) is written in English unless they explicitly ask otherwise. For personal items, keep the language they used: Egyptian Arabic in Arabic script if they spoke Arabic, English if they spoke English.`;
 
+function aboutBlock(aboutMe: string) {
+  return aboutMe.trim() ? `\n\nWhat you know about their life:\n<about_me>\n${aboutMe.trim()}\n</about_me>` : "";
+}
+
 export interface DumpImage {
   media_type: "image/jpeg" | "image/png" | "image/webp" | "image/gif";
   data: string; // base64
@@ -56,6 +60,7 @@ const Sorted = z.object({
     }),
   ),
   completed_item_ids: z.array(z.string()),
+  about_me_additions: z.array(z.string()),
   cycle_events: z.array(z.object({ type: z.enum(["period_start", "period_end"]), date: z.string() })),
 });
 export type SortResult = z.infer<typeof Sorted>;
@@ -81,13 +86,16 @@ const SORT_SYSTEM = `You are the organising brain behind a brain-dump app for so
 - "email" when a work idea or solution needs to be communicated to someone, or they say they should email or message someone.
 - "document" for a proposal, plan, write-up or longer piece.
 - "checklist" for a step-by-step list (packing, preparing an event, a process).
-Only draft an output when it genuinely saves them work; a simple reminder stays a reminder. If an existing output in the same folder covers the same thing (for example today's class slides), update it rather than creating a duplicate: set update_output_id to its id. For an email, set email_account to "work" for anything about their job, colleagues, clients or projects (it goes to Outlook), or "personal" (Gmail); null for other types. For each output give: a ref you invent ("o1", "o2"), the folder (required, same rules as above), folder_kind ("class" for a class, course or teaching; "project" for work projects; else "general"), folder_area, type, a clear title, and brief: everything from the dump the writer needs, plus what to produce. When you draft an email to send later, also add a reminder item ("Send the email to Ahmed about the API fix") for the next working morning at 09:00 local unless they said otherwise, with output_ref pointing at the email.
+Only draft an output when it genuinely saves them work; a simple reminder stays a reminder. If an existing output in the same folder covers the same thing (for example today's class slides), update it rather than creating a duplicate: set update_output_id to its id. For an email, set email_account to "work" for anything about their job, colleagues, clients or projects (it goes to Outlook), or "personal" (Gmail); null for other types. For each output give: a ref you invent ("o1", "o2"), the folder (required, same rules as above), folder_kind ("class" for a class, course or teaching; "project" for work projects; else "general"), folder_area, type, a clear title, and brief: everything from the dump the writer needs, plus what to produce. Big projects with a deadline (a thesis, a launch, an exam, an event, a move): create a folder for it, a "checklist" output titled like "<Project> plan" listing every stage as "- [ ] stage, by <weekday d Mon>" worked back from the deadline with a sensible buffer (about a week before the real deadline), flagging the riskiest or slowest step, and one reminder item per milestone with remind_at at 09:00 local two days before that milestone's date. If such a plan already exists in that folder, update it instead.
+When you draft an email to send later, also add a reminder item ("Send the email to Ahmed about the API fix") for the next working morning at 09:00 local unless they said otherwise, with output_ref pointing at the email.
 
 Photos and screenshots may come with the dump (a schedule, a flyer, a whiteboard, a chat, a receipt, a page of notes). Read them carefully and treat what is in them as part of the dump: dates and times become reminders, content becomes notes or material for outputs.
 
 3. Done things. They never tick things off by hand. If the dump says or clearly implies that something on their open list is done ("sent the email to Ahmed", "finally booked the dentist"), put that item's id in completed_item_ids. Only when you are confident; do not create a new item for something they just reported finishing.
 
-4. Cycle. If they say their period started or ended (in any wording or language, for example "period started", "جاتلي", "خلصت"), add a cycle_events entry with the local date it happened as YYYY-MM-DD (today unless they say otherwise). Do not also create an item for it. Otherwise cycle_events is empty.
+4. About them. about_me_additions: short, lasting facts about their life that are not already in about_me and would help organise future dumps (jobs and roles, studies and deadlines, key people and who they are, household, recurring commitments). One fact per string, written in English. Empty for most dumps.
+
+5. Cycle. If they say their period started or ended (in any wording or language, for example "period started", "جاتلي", "خلصت"), add a cycle_events entry with the local date it happened as YYYY-MM-DD (today unless they say otherwise). Do not also create an item for it. Otherwise cycle_events is empty.
 
 Do not invent things they did not say, do not lecture, and do not drop anything: if part of the dump fits nowhere, keep it as a note.
 
@@ -97,6 +105,7 @@ export interface SortContext {
   folders: { name: string; kind: string }[];
   outputs: { id: string; folder: string | null; type: string; title: string }[];
   openItems: { id: string; title: string }[];
+  aboutMe: string;
 }
 
 export async function sortDump(
@@ -126,7 +135,8 @@ export async function sortDump(
             `Existing folders: ${JSON.stringify(context.folders)}\n` +
             `Recent outputs: ${JSON.stringify(context.outputs)}\n` +
             `Open items: ${JSON.stringify(context.openItems)}\n\n` +
-            `<dump>\n${body || "(no text, see the attached images)"}\n</dump>`,
+            `<dump>\n${body || "(no text, see the attached images)"}\n</dump>` +
+            aboutBlock(context.aboutMe),
           images,
         ),
       },
@@ -149,6 +159,7 @@ export async function sortDump(
       update_output_id: o.update_output_id && knownOutputs.has(o.update_output_id) ? o.update_output_id : null,
     })),
     completed_item_ids: response.parsed_output.completed_item_ids.filter((id) => knownItems.has(id)),
+    about_me_additions: response.parsed_output.about_me_additions,
     cycle_events: response.parsed_output.cycle_events.filter((e) => /^\d{4}-\d{2}-\d{2}$/.test(e.date)),
   };
 }
@@ -181,6 +192,7 @@ export async function writeOutput(
   existing: string | null,
   now: Date,
   timeZone: string,
+  aboutMe = "",
 ): Promise<WrittenOutput> {
   const localNow = new Intl.DateTimeFormat("en-GB", { timeZone, dateStyle: "full", timeStyle: "short" }).format(now);
   const response = await client.beta.messages.parse({
@@ -195,7 +207,8 @@ export async function writeOutput(
         content: withImages(
           `Local time: ${localNow}.\nFolder: ${plan.folder}\nType: ${plan.type}\nTitle: ${plan.title}\n\n` +
             `What to produce:\n${plan.brief}\n\n<their_words>\n${dump}\n</their_words>` +
-            (existing ? `\n\n<existing_version>\n${existing}\n</existing_version>` : ""),
+            (existing ? `\n\n<existing_version>\n${existing}\n</existing_version>` : "") +
+            aboutBlock(aboutMe),
           images,
         ),
       },
@@ -232,6 +245,7 @@ The list must feel doable, not overwhelming:
 - why: one short, kind line on why it is on today's list ("Due today", "Moves your fitness goal forward", "Been waiting 9 days, 10 minutes should do it"). Never guilt-trip.
 - headline: a short, warm line for the top of the page, at most 8 words.
 - Daily Quran reading and the daily learning bite have their own place in the app; do not add them as entries.
+- Respect their real life: on workdays their job comes first in working hours, but a day should never be only work. Keep big deadlines moving with one concrete step most days.
 
 ${LANGUAGE}`;
 
@@ -254,6 +268,7 @@ export async function writePlan(
   areaActivity: Record<string, string>,
   now: Date,
   timeZone: string,
+  aboutMe = "",
 ): Promise<PlanOutput> {
   const localNow = new Intl.DateTimeFormat("en-GB", { timeZone, dateStyle: "full", timeStyle: "short" }).format(now);
   const response = await client.beta.messages.parse({
@@ -269,7 +284,8 @@ export async function writePlan(
           `Local time: ${localNow}.\n\n` +
           `Open items:\n${JSON.stringify(items, null, 1)}\n\n` +
           `Done in the last 3 days: ${recentlyDone.length ? recentlyDone.join("; ") : "nothing yet"}\n\n` +
-          `area_activity (days since anything was done in each area): ${JSON.stringify(areaActivity)}`,
+          `area_activity (days since anything was done in each area): ${JSON.stringify(areaActivity)}` +
+          aboutBlock(aboutMe),
       },
     ],
   });
@@ -351,6 +367,7 @@ export async function writeLearning(
   recentTitles: string[],
   interests: string[],
   now: Date,
+  aboutMe = "",
 ): Promise<LearningBite> {
   const response = await client.beta.messages.parse({
     model: MODEL,
@@ -364,7 +381,8 @@ export async function writeLearning(
         content:
           `Track: ${track}\nDate: ${now.toDateString()}\n` +
           `Recent topics (do not repeat): ${recentTitles.join("; ") || "none yet"}\n` +
-          `Their interests: ${interests.join(", ") || "unknown yet"}`,
+          `Their interests: ${interests.join(", ") || "unknown yet"}` +
+          aboutBlock(aboutMe),
       },
     ],
   });

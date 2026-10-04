@@ -20,6 +20,7 @@ export interface Profile {
   learning_daily: boolean;
   learning_minute: number;
   cycle_tracking: boolean;
+  about_me: string;
 }
 
 /** The person's settings and cycle history, shared by Today and Settings. */

@@ -87,6 +87,8 @@ export async function fileDump(
   now: Date,
 ): Promise<FileResult> {
   const images = await loadImages(db, dump.image_paths ?? []);
+  const { data: profile } = await db.from("profiles").select("about_me").eq("user_id", userId).single();
+  const aboutMe: string = profile?.about_me ?? "";
   const [folders, outputs, open] = await Promise.all([
     db.from("folders").select("id, name, kind").eq("user_id", userId).eq("archived", false),
     db
@@ -119,6 +121,7 @@ export async function fileDump(
       title: o.title,
     })),
     openItems: open.data ?? [],
+    aboutMe,
   });
 
   async function folderId(name: string | null, kind = "general", area = "personal"): Promise<string | null> {
@@ -155,7 +158,7 @@ export async function fileDump(
           const { data } = await db.from("outputs").select("content").eq("id", plan.update_output_id).single();
           existing = data?.content ?? null;
         }
-        const written = await writeOutput(plan, dump.body, images, existing, now, timeZone);
+        const written = await writeOutput(plan, dump.body, images, existing, now, timeZone, aboutMe);
         const row = {
           folder_id: await folderId(plan.folder, plan.folder_kind, plan.folder_area),
           type: plan.type,
@@ -209,6 +212,13 @@ export async function fileDump(
       .update({ status: "done", completed_at: now.toISOString() })
       .eq("user_id", userId)
       .in("id", sorted.completed_item_ids);
+  }
+
+  // Remember lasting facts about their life for every future dump, list and draft.
+  const facts = sorted.about_me_additions.map((f) => f.trim()).filter((f) => f && !aboutMe.includes(f));
+  if (facts.length) {
+    const next = [aboutMe.trim(), ...facts.map((f) => `- ${f}`)].filter(Boolean).join("\n").slice(-6000);
+    await db.from("profiles").update({ about_me: next }).eq("user_id", userId);
   }
 
   for (const e of sorted.cycle_events) {
