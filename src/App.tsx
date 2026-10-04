@@ -13,12 +13,15 @@ import { Login } from "./components/Login";
 import { Today } from "./components/Today";
 import { Everything } from "./components/Everything";
 import { Settings } from "./components/Settings";
+import { Calendar } from "./components/Calendar";
+import { Money } from "./components/Money";
+import { useMoney } from "./lib/money";
 
-type View = "today" | "folders" | "all" | "settings";
+type View = "today" | "calendar" | "folders" | "money" | "all" | "settings";
 
 function initialView(): View {
   const v = new URLSearchParams(location.search).get("view");
-  return v === "folders" || v === "all" || v === "settings" ? v : "today";
+  return v === "calendar" || v === "folders" || v === "money" || v === "all" || v === "settings" ? v : "today";
 }
 
 export function App() {
@@ -51,6 +54,7 @@ function SignedIn({ userId, email }: { userId: string; email: string }) {
   const today = usePlan(userId);
   const library = useLibrary(userId);
   const profileState = useProfile(userId);
+  const money = useMoney(userId);
   const [outputId, setOutputId] = useState<string | null>(() => new URLSearchParams(location.search).get("output"));
   const output = library.outputs.find((o) => o.id === outputId);
 
@@ -100,6 +104,14 @@ function SignedIn({ userId, email }: { userId: string; email: string }) {
             onOpenOutput={setOutputId}
           />
         )}
+        {view === "calendar" && (
+          <Calendar
+            brain={brain}
+            profileState={profileState}
+            plan={today.plan}
+          />
+        )}
+        {view === "money" && <Money money={money} profileState={profileState} brain={brain} />}
         {view === "folders" && <Folders brain={brain} library={library} onOpenOutput={setOutputId} />}
         {view === "all" && <Everything brain={brain} />}
         {view === "settings" && <Settings state={profileState} email={email} />}
@@ -108,8 +120,10 @@ function SignedIn({ userId, email }: { userId: string; email: string }) {
         {(
           [
             ["today", "☀️", "Today"],
+            ["calendar", "📅", "Calendar"],
             ["folders", "📁", "Folders"],
-            ["all", "🗂", "Everything"],
+            ["money", "💰", "Money"],
+            ["all", "🗂", "All"],
             ["settings", "⚙️", "Settings"],
           ] as const
         ).map(([v, icon, label]) => (

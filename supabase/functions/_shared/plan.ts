@@ -36,7 +36,8 @@ export async function buildPlan(
   }
 
   const since = new Date(now.getTime() - 30 * DAY).toISOString();
-  const { data: profile } = await db.from("profiles").select("about_me").eq("user_id", userId).single();
+  const { data: profile } = await db.from("profiles").select("about_me, currency, monthly_budget").eq("user_id", userId).single();
+  const money = await moneySummary(db, userId, planDate, profile?.currency ?? "EGP", profile?.monthly_budget ?? null);
   const [{ data: open, error }, { data: done }] = await Promise.all([
     db.from("items").select("*").eq("user_id", userId).in("status", ["open", "snoozed"]),
     db
@@ -82,7 +83,7 @@ export async function buildPlan(
     areaActivity,
     now,
     timeZone,
-    profile?.about_me ?? "",
+    [profile?.about_me ?? "", money].filter(Boolean).join("\n\n"),
   );
 
   const entries: PlanRow["entries"] = [];
@@ -112,4 +113,17 @@ export async function buildPlan(
   const { error: upsertError } = await db.from("plans").upsert({ user_id: userId, ...plan });
   if (upsertError) throw upsertError;
   return { plan, created: true };
+}
+
+/** A few lines on this month's money and savings goals, so the list can include a money step when it matters. */
+async function moneySummary(db: SupabaseClient, userId: string, today: string, currency: string, budget: number | null): Promise<string> {
+  const [{ data: spent }, { data: goals }] = await Promise.all([
+    db.from("money_entries").select("amount, category").eq("user_id", userId).eq("kind", "expense").gte("happened_on", `${today.slice(0, 7)}-01`),
+    db.from("savings_goals").select("title, target, saved, deadline").eq("user_id", userId).eq("status", "active"),
+  ]);
+  if (!spent?.length && !goals?.length && !budget) return "";
+  const total = (spent ?? []).reduce((s, e) => s + Number(e.amount), 0);
+  const lines = [`Money this month (day ${Number(today.slice(8))}): spent ${Math.round(total)} ${currency}${budget ? ` of a ${budget} budget` : ", no budget set"}.`];
+  for (const g of goals ?? []) lines.push(`Savings goal "${g.title}": ${g.saved} of ${g.target}${g.deadline ? ` by ${g.deadline}` : ""}.`);
+  return lines.join("\n");
 }

@@ -46,6 +46,7 @@ const db: Record<string, Row[]> = {
     weekend_days: [6, 0], latitude: 30.04, longitude: 31.24, prayer_reminders: true, prayer_fajr: true, quran_daily: true,
     quran_page: 112, quran_last_read: null, quran_streak: 4, learning_daily: true, learning_minute: 780, cycle_tracking: true,
     study_topics: "PMP, SAP Activate", cooking_daily: true, cooking_minute: 900, last_meal_on: null, meal_today_id: null,
+    currency: "EGP", monthly_budget: 25000, budget_categories: { groceries: 7000, eating_out: 3000 }, last_budget_alert_for: null,
     about_me: "Full-time remote SAP project manager. Part-time university teaching assistant (Information Systems tutorials). Finishing my thesis, deadline 21 Dec. Married. Studying for PMP and SAP Activate.",
   }],
   folders: [
@@ -86,6 +87,11 @@ const db: Record<string, Row[]> = {
       email_to: null, email_subject: null, email_account: null, status: "draft", created_at: iso(-4), updated_at: iso(-4) },
   ],
   items: [
+    item("13", { kind: "reminder", area: "career", title: "Steering committee call (Teams)", remind_at: new Date(new Date(now + 86400e3).setHours(11, 0, 0, 0)).toISOString() }),
+    item("14", { kind: "reminder", area: "education", title: "ERP tutorial, room 204", remind_at: new Date(new Date(now + 2 * 86400e3).setHours(14, 0, 0, 0)).toISOString(), folder_id: "f1" }),
+    item("15", { kind: "reminder", area: "education", title: "Send final thesis draft to supervisor", remind_at: new Date(new Date(now + 5 * 86400e3).setHours(9, 0, 0, 0)).toISOString(), folder_id: "f3", priority: 1 }),
+    item("16", { kind: "reminder", area: "home_family", title: "Dinner at Mama's", remind_at: new Date(new Date(now + 6 * 86400e3).setHours(19, 30, 0, 0)).toISOString() }),
+    item("17", { kind: "reminder", area: "health", title: "Dentist check-up", remind_at: new Date(new Date(now + 11 * 86400e3).setHours(17, 0, 0, 0)).toISOString() }),
     item("12", { kind: "reminder", area: "personal", title: "Film 2 TikToks (batch session)", folder_id: "f6", remind_at: iso(40) }),
     item("1", { kind: "reminder", area: "career", title: "Send Mariam the migration idea", remind_at: iso(-1), priority: 1, folder_id: "f2", output_id: "o1" }),
     item("2", { area: "education", title: "Rework thesis chapter 3 from the supervisor's comments", priority: 1, folder_id: "f3", remind_at: iso(3) }),
@@ -105,6 +111,27 @@ const db: Record<string, Row[]> = {
     { id: "c1", user_id: USER, started_on: day(-41), ended_on: day(-36) },
   ],
   plans: [],
+  savings_goals: [
+    { id: "g1", user_id: USER, title: "Umrah next spring", target: 120000, saved: 46000, currency: "EGP", deadline: day(180), status: "active", created_at: iso(-900) },
+    { id: "g2", user_id: USER, title: "Emergency fund", target: 60000, saved: 21500, currency: "EGP", deadline: null, status: "active", created_at: iso(-2000) },
+  ],
+  money_entries: [
+    ...([
+      ["expense", 1850, "groceries", "Weekly groceries", 0],
+      ["expense", 640, "eating_out", "Lunch with Nour", -1],
+      ["expense", 600, "bills", "Internet", -2],
+      ["saving", 3000, "savings", "Umrah fund", -3],
+      ["expense", 2300, "groceries", "Carrefour big shop", -4],
+      ["expense", 450, "transport", "Uber to campus", -5],
+      ["expense", 1200, "health", "Pharmacy", -7],
+      ["income", 9000, "income", "TA salary", -8],
+      ["expense", 2800, "clothes", "Abaya", -9],
+      ["expense", 500, "charity", "Sadaqa", -10],
+      ["expense", 4200, "home", "Cleaning help (month)", -11],
+    ] as const)
+      .filter(([, , , , d]) => day(d).slice(0, 7) === day(0).slice(0, 7))
+      .map(([kind, amount, category, note, d], n) => ({ id: `m${n}`, user_id: USER, kind, amount, currency: "EGP", category, note, happened_on: day(d), goal_id: kind === "saving" ? "g1" : null, created_at: iso(d * 24) })),
+  ],
   push_subscriptions: [],
 };
 
@@ -233,10 +260,28 @@ const RULES: [RegExp, string, string | null][] = [
   [/friend|nour|dinner|birthday|صحاب/i, "friends", null],
 ];
 
+const MONEY_WORDS: [RegExp, string][] = [
+  [/grocer|carrefour|supermarket|سوبر/i, "groceries"], [/lunch|dinner|cafe|coffee|restaurant|talabat|مطعم/i, "eating_out"],
+  [/uber|careem|petrol|gas|بنزين/i, "transport"], [/bill|internet|electric|water|نت|كهربا/i, "bills"],
+  [/pharma|doctor|دكتور|صيدلي/i, "health"], [/clothes|dress|shoes|abaya/i, "clothes"], [/gift|هدية/i, "gifts"],
+];
+
+/** "paid 450 for groceries" becomes a money entry instead of a task. */
+function fileMoney(piece: string): boolean {
+  const amount = piece.match(/(\d[\d,]*(?:\.\d+)?)\s*(?:k\b)?/i);
+  const kind = /salary|got paid|earned|income|مرتب/i.test(piece) ? "income" : /saved|put .* aside|حوشت/i.test(piece) ? "saving" : /paid|spent|bought|cost|دفعت|اشتريت/i.test(piece) ? "expense" : null;
+  if (!amount || !kind) return false;
+  const value = Number(amount[1].replace(/,/g, "")) * (/\dk\b/i.test(amount[0]) ? 1000 : 1);
+  const category = kind === "income" ? "income" : kind === "saving" ? "savings" : MONEY_WORDS.find(([re]) => re.test(piece))?.[1] ?? "other";
+  db.money_entries.unshift({ id: newId(), user_id: USER, kind, amount: value, currency: "EGP", category, note: piece.replace(/[.!]$/, ""), happened_on: new Date().toLocaleDateString("en-CA"), goal_id: null, created_at: new Date().toISOString() });
+  return true;
+}
+
 function fileDump(dump: Row) {
   const text = String(dump.body ?? "").trim();
   const pieces = text.split(/\n+|(?<=[.!?])\s+|\band also\b/i).map((p) => p.trim()).filter((p) => p.length > 2);
   for (const piece of pieces.length ? pieces : ["Look at the photo you added"]) {
+    if (fileMoney(piece)) continue;
     const rule = RULES.find(([re]) => re.test(piece));
     const remind = /tomorrow|بكرة/i.test(piece) ? new Date(now + 86400e3).setHours(9, 0, 0, 0) : null;
     db.items.unshift(item(newId(), {

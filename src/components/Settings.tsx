@@ -223,6 +223,35 @@ export function Settings({ state, email }: { state: ReturnType<typeof useProfile
           </section>
 
           <section className="card">
+            <h2>Money</h2>
+            <div className="row-fields">
+              <label className="field">
+                Currency
+                <select value={profile.currency} onChange={(e) => void save({ currency: e.target.value })}>
+                  {["EGP", "USD", "EUR", "GBP", "SAR", "AED", "KWD", "QAR"].map((c) => (
+                    <option key={c}>{c}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field">
+                Monthly budget
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  placeholder="Not set"
+                  defaultValue={profile.monthly_budget ?? ""}
+                  onBlur={(e) => {
+                    const v = e.target.value === "" ? null : Number(e.target.value);
+                    if (v !== profile.monthly_budget) void save({ monthly_budget: v });
+                  }}
+                />
+              </label>
+            </div>
+            <p className="muted small">You get one heads-up at 80% of the budget and one if it runs out. You can also just say "my grocery budget is 6000".</p>
+          </section>
+
+          <section className="card">
             <h2>Cooking</h2>
             <Toggle
               label="Tell me what to cook each day"

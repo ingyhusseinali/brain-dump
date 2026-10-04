@@ -170,3 +170,49 @@ a.pill { text-decoration: none; display: inline-flex; align-items: center; color
 .welcome p { margin: 6px 0 0; }
 
 .demo-banner { padding: 8px 16px; font-size: 13px; text-align: center; background: #2f6f5e; color: #fff; }
+
+/* Money */
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.money-big { font-size: 1.8rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.money-big .muted { font-size: 1rem; font-weight: 400; }
+.money-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; }
+.num { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.num.good { color: var(--good); }
+.bar { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.bar span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.bar span.good { background: var(--good); }
+.bar span.warn { background: #e0a100; }
+.bar span.over { background: var(--warn); }
+.cat-row { display: flex; flex-direction: column; gap: 6px; }
+.cat-head { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.entry-row, .goal-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; }
+.goal-row { grid-template-columns: auto 1fr; }
+.inline-form { display: flex; gap: 8px; }
+.inline-form input { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.card input, .card select { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: inherit; font: inherit; }
+.card.is-done { border-color: var(--good); }
+
+/* Calendar */
+.cal-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.cal-nav { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; text-align: center; }
+.cal-nav .link { text-align: center; font-weight: 600; }
+.cal-cycle { margin: 0; padding: 8px 12px; border-radius: 12px; font-size: 0.9rem; }
+.cal-cycle.is-period, .swatch.is-period, .month-day.is-period { background: color-mix(in srgb, var(--warn) 14%, transparent); }
+.cal-cycle.is-fertile, .swatch.is-fertile, .month-day.is-fertile { background: color-mix(in srgb, var(--good) 16%, transparent); }
+.timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.tl-row { width: 100%; display: grid; grid-template-columns: 4.8rem auto 1fr; gap: 10px; align-items: start; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; color: inherit; font: inherit; }
+.tl-row:disabled { opacity: 1; background: transparent; border-style: dashed; }
+.tl-row.is-done .tl-text { text-decoration: line-through; opacity: 0.6; }
+.tl-time { color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; padding-top: 2px; }
+.tl-text { min-width: 0; overflow-wrap: anywhere; }
+.now-line { color: var(--accent); font-size: 0.8rem; font-weight: 600; border-top: 2px solid var(--accent); padding-top: 2px; margin: 4px 0; }
+.month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.month-wd { text-align: center; font-size: 0.75rem; color: var(--muted); }
+.month-day { aspect-ratio: 1; min-width: 0; max-width: 100%; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: inherit; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 0; }
+.month-day.is-today { border: 2px solid var(--accent); font-weight: 700; }
+.month-count { min-width: 1.2rem; padding: 0 4px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 0.7rem; line-height: 1.2rem; }
+.legend { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dot, .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 999px; }
+.dot { background: var(--accent); }
+.swatch { border-radius: 4px; }
+.tl-actions { display: flex; gap: 8px; padding: 6px 0 4px 5.8rem; flex-wrap: wrap; }

@@ -31,6 +31,10 @@ function withImages(text: string, images: DumpImage[]) {
 
 const OUTPUT_TYPES = ["slides", "notes", "email", "document", "checklist", "recipe", "content"] as const;
 const FOLDER_KINDS = ["class", "project", "general"] as const;
+export const MONEY_CATEGORIES = [
+  "groceries", "eating_out", "home", "bills", "transport", "health", "personal_care", "clothes",
+  "family", "gifts", "charity", "education", "subscriptions", "travel", "income", "savings", "other",
+] as const;
 
 const Sorted = z.object({
   items: z.array(
@@ -62,6 +66,21 @@ const Sorted = z.object({
   completed_item_ids: z.array(z.string()),
   about_me_additions: z.array(z.string()),
   cycle_events: z.array(z.object({ type: z.enum(["period_start", "period_end"]), date: z.string() })),
+  money_entries: z.array(
+    z.object({
+      kind: z.enum(["expense", "income", "saving"]),
+      amount: z.number(),
+      currency: z.string(),
+      category: z.enum(MONEY_CATEGORIES),
+      note: z.string().nullable(),
+      date: z.string(),
+      goal_title: z.string().nullable(),
+    }),
+  ),
+  new_savings_goals: z.array(z.object({ title: z.string(), target: z.number(), currency: z.string(), deadline: z.string().nullable() })),
+  budget: z
+    .object({ monthly_total: z.number().nullable(), categories: z.array(z.object({ category: z.enum(MONEY_CATEGORIES), amount: z.number() })) })
+    .nullable(),
 });
 export type SortResult = z.infer<typeof Sorted>;
 export type SortedItem = SortResult["items"][number];
@@ -99,6 +118,12 @@ Photos and screenshots may come with the dump (a schedule, a flyer, a whiteboard
 
 5. Cycle. If they say their period started or ended (in any wording or language, for example "period started", "جاتلي", "خلصت"), add a cycle_events entry with the local date it happened as YYYY-MM-DD (today unless they say otherwise). Do not also create an item for it. Otherwise cycle_events is empty.
 
+6. Money. They track money by just mentioning it, so catch every amount:
+- money_entries: each thing they bought or paid ("paid 450 for groceries", "دفعت النت 600", a receipt photo: one entry with the total), income they received ("salary came in", "got paid for the course"), and money they put aside for a savings goal (kind "saving", goal_title = the exact title of their existing savings goal it is for). currency: their default currency (given below) unless they name another; date: YYYY-MM-DD local, today unless they say otherwise; note: a few words on what it was. Do not also create an item for money already spent or received. A bill still to pay is a reminder item, not an entry.
+- new_savings_goals: when they set a goal to save an amount for something ("I want to save 50k for a car by June"). deadline YYYY-MM-DD or null. Also add a goal item in area money for it.
+- budget: only when they set or change their monthly budget, in total and/or per category; otherwise null.
+Otherwise these are empty or null.
+
 Do not invent things they did not say, do not lecture, and do not drop anything: if part of the dump fits nowhere, keep it as a note.
 
 ${LANGUAGE}`;
@@ -108,6 +133,8 @@ export interface SortContext {
   outputs: { id: string; folder: string | null; type: string; title: string }[];
   openItems: { id: string; title: string }[];
   aboutMe: string;
+  currency?: string;
+  savingsGoals?: { title: string; target: number; saved: number }[];
 }
 
 export async function sortDump(
@@ -136,7 +163,8 @@ export async function sortDump(
           `Current local time: ${localNow} (time zone ${timeZone}, UTC now ${now.toISOString()}).\n\n` +
             `Existing folders: ${JSON.stringify(context.folders)}\n` +
             `Recent outputs: ${JSON.stringify(context.outputs)}\n` +
-            `Open items: ${JSON.stringify(context.openItems)}\n\n` +
+            `Open items: ${JSON.stringify(context.openItems)}\n` +
+            `Default currency: ${context.currency ?? "EGP"}. Savings goals: ${JSON.stringify(context.savingsGoals ?? [])}\n\n` +
             `<dump>\n${body || "(no text, see the attached images)"}\n</dump>` +
             aboutBlock(context.aboutMe),
           images,
@@ -163,6 +191,9 @@ export async function sortDump(
     completed_item_ids: response.parsed_output.completed_item_ids.filter((id) => knownItems.has(id)),
     about_me_additions: response.parsed_output.about_me_additions,
     cycle_events: response.parsed_output.cycle_events.filter((e) => /^\d{4}-\d{2}-\d{2}$/.test(e.date)),
+    money_entries: response.parsed_output.money_entries.filter((m) => m.amount > 0 && /^\d{4}-\d{2}-\d{2}$/.test(m.date)),
+    new_savings_goals: response.parsed_output.new_savings_goals.filter((g) => g.target > 0),
+    budget: response.parsed_output.budget,
   };
 }
 

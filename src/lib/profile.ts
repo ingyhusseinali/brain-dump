@@ -26,6 +26,9 @@ export interface Profile {
   cooking_minute: number;
   last_meal_on: string | null;
   meal_today_id: string | null;
+  currency: string;
+  monthly_budget: number | null;
+  budget_categories: Record<string, number>;
 }
 
 /** The person's settings and cycle history, shared by Today and Settings. */

@@ -17,6 +17,10 @@ An ADHD-friendly brain-dump app for phone and laptop. Type or say whatever is in
 - **Daily learning.** A 5 to 10 minute bite every day, alternating Sunni Islamic knowledge and general ideas.
 - **Cycle.** Optional tracking pauses prayer reminders during a period and gives a discreet heads-up for the estimated fertile window.
 - **Nudges that don't fade into the background.** Re-nudges change style each time (tiny step, 2-minute timer, why it matters, a choice, a joke), and "Just show me one thing" turns the list into a single card with a timer.
+- **Calendar.** A day timeline and a month view of everything with a time: reminders, today's list, prayers, the daily cooking and learning moments, and period and fertile days.
+- **Money and goals.** Say "paid 450 for groceries", "salary came in" or dump a receipt, and it lands in this month's spending by category. Set a monthly budget (with a heads-up at 80%), savings goals with progress and how much to save a month, and life goals with small steps in the daily list.
+- **Cooking.** Dump a recipe, screenshot or reel you want to try and it's saved, cleaned up, in Recipes. Each afternoon you get one answer to "what should I cook today?", or tap "Decide for me".
+- **Content planning.** TikTok and Instagram ideas become ready-to-film plans (hook, script, shots, caption, hashtags, best time), with a content calendar and filming reminders.
 - **Synced live** between phone and laptop.
 
 ## How it's built
