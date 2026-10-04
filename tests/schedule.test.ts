@@ -8,6 +8,7 @@ import {
   pickNow,
   planCandidates,
   snoozeUntil,
+  staleToRetire,
   type Item,
   type Profile,
 } from "../supabase/functions/_shared/schedule";
@@ -21,6 +22,8 @@ function item(over: Partial<Item> = {}): Item {
     kind: "task",
     area: "personal",
     origin: "dump",
+    folder_id: null,
+    output_id: null,
     title: "Thing",
     details: null,
     remind_at: null,
@@ -105,5 +108,21 @@ describe("what to show", () => {
     expect(snoozeUntil("tonight", local).getDate()).toBe(5); // already past 19:00, so tomorrow evening
     const nextWeek = snoozeUntil("next_week", local);
     expect([nextWeek.getDay(), nextWeek.getHours()]).toEqual([1, 9]);
+  });
+});
+
+describe("staleToRetire", () => {
+  const old = new Date(now.getTime() - 30 * 86_400_000).toISOString();
+  it("retires only old, ordinary, undated tasks", () => {
+    const stale = item({ title: "stale", updated_at: old });
+    const keep = [
+      item({ updated_at: old, priority: 1 }),
+      item({ updated_at: old, remind_at: old }),
+      item({ updated_at: old, kind: "idea" }),
+      item({ updated_at: old, kind: "goal" }),
+      item({ updated_at: old, folder_id: "f1" }),
+      item(),
+    ];
+    expect(staleToRetire([stale, ...keep], now).map((i) => i.title)).toEqual(["stale"]);
   });
 });

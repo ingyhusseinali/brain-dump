@@ -5,6 +5,8 @@ An ADHD-friendly brain-dump app for phone and laptop. Type or say whatever is in
 ## What it does
 
 - **Capture first.** One box, one button, or talk. Messy is fine. It works offline and syncs later.
+- **Everything put in its place.** Claude files thoughts into folders per class or project, and turns them into something ready to use: slides and lesson notes for a class, an email draft for a work idea (with a reminder to send it next morning), documents and checklists. Slides open in a full-screen presenter, emails open straight in Mail, and both stay readable offline.
+- **Zero upkeep.** You never have to tick anything. Say "sent the email to Omar" and it clears itself; tasks ignored for three weeks quietly step aside.
 - **Today's list on the first page.** Each morning Claude writes 3 to 7 things to do, in order, from everything you've dumped. It adds small next steps for goals and life areas that have gone quiet: career, education, money, health, home & family, friends, personal, spiritual, religion.
 - **Follow-ups.** Reminders arrive as notifications, ignored ones come back up to 3 times, snoozes wake up on time, and a morning notification says your list is ready. Quiet hours are respected.
 - **Everything, findable.** Filter by life area or type, search, and see what you finished this week.
@@ -16,9 +18,9 @@ An ADHD-friendly brain-dump app for phone and laptop. Type or say whatever is in
 | --- | --- |
 | App | React + Vite installable web app (PWA), hosted on GitHub Pages |
 | Data, login, sync | Supabase: Postgres with row level security, email-code login, Realtime |
-| `process-dump` function | Claude splits a dump into items with life area, time and priority |
+| `process-dump` function | Claude splits a dump into items (life area, time, priority, folder), drafts or updates slides, notes, emails and documents, and marks done what you said you finished. Runs in the background; the `nudge` job retries anything left over |
 | `plan-today` function | Claude writes today's list, adding steps for neglected goals and areas |
-| `nudge` function | Runs every 5 minutes from a database cron job: reminders, re-nudges, snoozes, morning list |
+| `nudge` function | Runs every 5 minutes from a database cron job: reminders, re-nudges, snoozes, morning list, stale-task clean-up |
 | Notifications | Web Push. Works on iPhone once the app is added to the Home Screen (iOS 16.4+) |
 
 The shared follow-up rules live in `supabase/functions/_shared/schedule.ts` and are tested in `tests/`.

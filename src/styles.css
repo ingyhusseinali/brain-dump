@@ -95,3 +95,38 @@ main { max-width: 640px; margin: 0 auto; }
 .tabs button { flex: 1; max-width: 200px; background: none; border: 0; padding: 10px 0; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 0.78rem; color: var(--muted); }
 .tabs button span { font-size: 1.3rem; }
 .tabs button.is-on { color: var(--accent); font-weight: 600; }
+
+.small { font-size: 0.85rem; }
+.link.inline { padding: 0; display: inline; }
+a.primary { text-decoration: none; display: inline-flex; align-items: center; }
+
+.output-card { width: 100%; display: flex; align-items: center; gap: 12px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
+.output-card.is-done { opacity: 0.6; }
+.output-icon { font-size: 1.5rem; flex: none; width: 36px; text-align: center; }
+.output-text { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.chev { color: var(--muted); font-size: 1.4rem; }
+
+.sheet { position: fixed; inset: 0; background: var(--bg); overflow-y: auto; z-index: 10; padding-top: env(safe-area-inset-top); }
+.sheet-head { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.sheet-body { max-width: 760px; margin: 0 auto; padding: 16px 16px 48px; display: flex; flex-direction: column; gap: 12px; }
+.email-head { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.email-head dt { color: var(--muted); }
+.email-head dd { margin: 0; }
+
+.md h1 { font-size: 1.3rem; } .md h2 { font-size: 1.1rem; } .md h3 { font-size: 1rem; }
+.md p, .md ul, .md ol { margin: 0 0 10px; }
+.md ul, .md ol { padding-left: 1.3em; }
+.md li { margin-bottom: 4px; }
+.doc { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+.slide-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; counter-reset: slide; }
+.slide-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; aspect-ratio: auto; position: relative; counter-increment: slide; }
+.slide-card::before { content: counter(slide); position: absolute; top: 10px; right: 14px; color: var(--muted); font-size: 0.8rem; }
+.slide-notes { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); color: var(--muted); font-size: 0.9rem; }
+
+.presenter { position: fixed; inset: 0; z-index: 20; background: #101114; color: #f4f3ef; display: flex; flex-direction: column; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+.presenter-slide { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 5vh 7vw; font-size: clamp(1.1rem, 3.2vw, 2.2rem); overflow: auto; }
+.presenter-slide h1 { font-size: 1.7em; margin-bottom: 0.6em; }
+.presenter-notes { max-height: 30vh; overflow: auto; padding: 12px 7vw; background: #1c1e24; color: #c9c7c0; font-size: 1rem; }
+.presenter-bar { display: flex; justify-content: center; align-items: center; gap: 16px; padding: 10px; }
+.presenter-bar button { background: #2a2d35; color: #f4f3ef; border: 0; border-radius: 999px; min-width: 44px; height: 44px; padding: 0 14px; font-size: 1.1rem; }
+.presenter-bar button:disabled { opacity: 0.35; }

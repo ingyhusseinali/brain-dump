@@ -12,6 +12,8 @@ export interface Item {
   kind: ItemKind;
   area: Area;
   origin: "dump" | "plan" | "email";
+  folder_id: string | null;
+  output_id: string | null;
   title: string;
   details: string | null;
   remind_at: string | null;
@@ -160,4 +162,24 @@ export function snoozeUntil(preset: SnoozePreset, now: Date): Date {
       return d;
     }
   }
+}
+
+/** Untouched this long, an ordinary task quietly leaves the active list instead of piling up. */
+export const RETIRE_AFTER_DAYS = 21;
+
+/**
+ * Tasks that have been ignored for weeks: not important, no date, not part of a folder.
+ * Ideas, notes, goals and anything with a reminder are never retired.
+ */
+export function staleToRetire(items: Item[], now: Date): Item[] {
+  const cutoff = now.getTime() - RETIRE_AFTER_DAYS * DAY;
+  return items.filter(
+    (i) =>
+      i.status === "open" &&
+      i.kind === "task" &&
+      i.priority >= 2 &&
+      !i.remind_at &&
+      !i.folder_id &&
+      Date.parse(i.updated_at) < cutoff,
+  );
 }

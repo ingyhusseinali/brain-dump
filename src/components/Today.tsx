@@ -1,5 +1,7 @@
 import { useMemo } from "react";
 import { Capture } from "./Capture";
+import { OutputCard } from "./OutputCard";
+import type { useLibrary } from "../lib/library";
 import { ItemRow } from "./ItemRow";
 import type { useBrain } from "../lib/items";
 import type { usePlan } from "../lib/plan";
@@ -8,10 +10,12 @@ import { pickNow, type Item } from "../../supabase/functions/_shared/schedule";
 interface Props {
   brain: ReturnType<typeof useBrain>;
   today: ReturnType<typeof usePlan>;
+  library: ReturnType<typeof useLibrary>;
   highlightId: string | null;
+  onOpenOutput: (id: string) => void;
 }
 
-export function Today({ brain, today, highlightId }: Props) {
+export function Today({ brain, today, library, highlightId, onOpenOutput }: Props) {
   const { items, actions } = brain;
   const { plan, writing, failed, rewrite } = today;
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
@@ -36,6 +40,12 @@ export function Today({ brain, today, highlightId }: Props) {
       (i.priority === 1 || (i.remind_at && Date.parse(i.remind_at) <= endOfToday.getTime())),
   );
 
+  // Drafts Claude made in the last few days that haven't been used yet.
+  const ready = library.outputs
+    .filter((o) => o.status === "draft" && Date.now() - Date.parse(o.updated_at) < 3 * 86_400_000)
+    .slice(0, 4);
+  const folderName = (id: string | null) => library.folders.find((f) => f.id === id)?.name ?? null;
+
   const fallback = !plan ? pickNow(items, new Date()) : [];
   const row = (item: Item, why?: string) => (
     <ItemRow
@@ -53,6 +63,19 @@ export function Today({ brain, today, highlightId }: Props) {
   return (
     <div className="page">
       <Capture />
+
+      {ready.length > 0 && (
+        <section aria-labelledby="ready-title">
+          <h2 id="ready-title" className="section-title">
+            Ready for you
+          </h2>
+          <ul className="list">
+            {ready.map((o) => (
+              <OutputCard key={o.id} output={o} folderName={folderName(o.folder_id)} onOpen={() => onOpenOutput(o.id)} />
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="today" aria-labelledby="today-title">
         <header className="today-head">
@@ -75,7 +98,7 @@ export function Today({ brain, today, highlightId }: Props) {
 
         {!plan && !writing && fallback.length > 0 && <ol className="list">{fallback.map((i) => row(i))}</ol>}
         {!plan && !writing && !fallback.length && (
-          <p className="muted">Nothing here yet. Dump whatever is on your mind above and I'll turn it into a list.</p>
+          <p className="muted">Nothing here yet. Just talk: whatever is on your mind goes in the box above, and I'll sort, file and prepare things for you.</p>
         )}
 
         {fresh.length > 0 && (
@@ -86,9 +109,12 @@ export function Today({ brain, today, highlightId }: Props) {
         )}
 
         {plan && (
-          <button className="link" onClick={() => void rewrite()} disabled={writing}>
-            ↻ Rewrite today's list
-          </button>
+          <p className="muted small">
+            No need to tick things off: tell me when you've done something and I'll clear it. Anything left over is rethought tomorrow.{" "}
+            <button className="link inline" onClick={() => void rewrite()} disabled={writing}>
+              Rewrite now
+            </button>
+          </p>
         )}
       </section>
     </div>

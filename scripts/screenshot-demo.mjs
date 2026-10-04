@@ -13,6 +13,15 @@ const items = [
   mk("6", { kind: "goal", area: "health", title: "Get fitter this year" }),
   mk("7", { kind: "idea", area: "personal", title: "Start a pottery class" }),
 ];
+const folders = [
+  { id: "f1", name: "Thursday Biology class", kind: "class", area: "education", archived: false, updated_at: iso(-1) },
+  { id: "f2", name: "Clinic booking app", kind: "project", area: "career", archived: false, updated_at: iso(-3) },
+];
+const slides = "# Photosynthesis\nThursday Biology · Year 9\n---\n# Why plants need light\n- Light is energy for making food\n- Chlorophyll captures it\n- Happens in the leaves\nNotes:\nAsk: what happens to a plant left in a dark cupboard?\n---\n# The equation\n- Carbon dioxide + water → glucose + oxygen\n- Needs light and chlorophyll\n---\n# Quick activity\n- Pairs: label the leaf diagram\n- 5 minutes, then share";
+const outputs = [
+  { id: "o1", folder_id: "f1", type: "slides", title: "Photosynthesis intro slides", content: slides, email_to: null, email_subject: null, status: "draft", created_at: iso(-2), updated_at: iso(-2) },
+  { id: "o2", folder_id: "f2", type: "email", title: "Fix for the double-booking bug", content: "Hi Omar,\n\nWhile driving home I worked out the double-booking issue: we check availability before taking the lock. If we lock the slot first and then check, the race goes away.\n\nCan we pair on it tomorrow morning?\n\nThanks,\nIngy", email_to: "Omar", email_subject: "Idea for the double-booking bug", status: "draft", created_at: iso(-14), updated_at: iso(-14) },
+];
 const plan = { plan_date: new Date().toISOString().slice(0, 10), headline: "A calm, doable Sunday", generated_at: iso(-2), entries: [
   { item_id: "1", why: "Overdue since this morning, two minutes on the phone" },
   { item_id: "2", why: "Due today at 5pm" },
@@ -34,6 +43,8 @@ for (const [name, w, h, dark] of [["phone", 390, 844, false], ["phone-dark", 390
     else if (u.includes("/rest/v1/items")) body = items.filter((i) => i.status === "done");
     else if (u.includes("/rest/v1/plans")) body = plan;
     else if (u.includes("/rest/v1/dumps")) body = [];
+    else if (u.includes("/rest/v1/folders")) body = folders;
+    else if (u.includes("/rest/v1/outputs")) body = outputs;
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   });
   const page = await ctx.newPage();
@@ -41,9 +52,17 @@ for (const [name, w, h, dark] of [["phone", 390, 844, false], ["phone-dark", 390
   await page.waitForTimeout(1200);
   await page.screenshot({ path: `/tmp/claude-0/shot-${name}.png`, fullPage: true });
   if (name === "phone") {
-    await page.getByRole("button", { name: /Everything/ }).click();
+    await page.getByRole("button", { name: /Folders/ }).click();
     await page.waitForTimeout(400);
-    await page.screenshot({ path: `/tmp/claude-0/shot-everything.png`, fullPage: true });
+    await page.screenshot({ path: `/tmp/claude-0/shot-folders.png`, fullPage: true });
+    await page.getByRole("button", { name: /Today/ }).click();
+    await page.getByRole("button", { name: /Photosynthesis/ }).click();
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `/tmp/claude-0/shot-slides.png` });
+    await page.getByRole("button", { name: /Present/ }).click();
+    await page.waitForTimeout(300);
+    await page.getByRole("button", { name: "›" }).click();
+    await page.screenshot({ path: `/tmp/claude-0/shot-present.png` });
   }
   await ctx.close();
 }

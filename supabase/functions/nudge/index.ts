@@ -4,12 +4,14 @@
 import { createClient } from "npm:@supabase/supabase-js@2.117.2";
 import { sendToUser } from "../_shared/push.ts";
 import { buildPlan } from "../_shared/plan.ts";
+import { processDump } from "../_shared/file.ts";
 import {
   digestDue,
   dueNudges,
   inQuietHours,
   localDate,
   localHour,
+  staleToRetire,
   type Item,
   type Nudge,
   type Profile,
@@ -30,6 +32,25 @@ function nudgeText(n: Nudge): { title: string; body: string } {
 }
 
 async function runForUser(userId: string, profile: Profile, items: Item[], now: Date) {
+  // Safety net: file any dump the app saved but couldn't get filed (closed too soon, no signal).
+  const { data: waiting } = await db
+    .from("dumps")
+    .select("id, body")
+    .eq("user_id", userId)
+    .is("processed_at", null)
+    .is("error", null)
+    .lt("created_at", new Date(now.getTime() - 2 * 60_000).toISOString())
+    .order("created_at")
+    .limit(3);
+  for (const dump of waiting ?? []) await processDump(db, userId, dump, profile.timezone).catch(() => {});
+
+  // Nothing to maintain: tasks ignored for weeks quietly step aside (they stay searchable).
+  const stale = staleToRetire(items, now);
+  if (stale.length) {
+    await db.from("items").update({ status: "archived" }).in("id", stale.map((i) => i.id));
+    items = items.filter((i) => !stale.includes(i));
+  }
+
   const quiet = inQuietHours(localHour(now, profile.timezone), profile.quiet_start, profile.quiet_end);
   const nowIso = now.toISOString();
 
@@ -41,7 +62,7 @@ async function runForUser(userId: string, profile: Profile, items: Item[], now: 
     }
     if (quiet) continue;
     const text = nudgeText(n);
-    await sendToUser(db, userId, { ...text, url: `?item=${n.item.id}`, tag: n.item.id });
+    await sendToUser(db, userId, { ...text, url: n.item.output_id ? `?output=${n.item.output_id}` : `?item=${n.item.id}`, tag: n.item.id });
     await db
       .from("items")
       .update({ last_nudged_at: nowIso, nudge_count: n.reason === "again" ? n.item.nudge_count + 1 : 1 })

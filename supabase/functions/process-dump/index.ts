@@ -1,7 +1,10 @@
-// Sorts one dump into items. Called by the app right after it saves a dump,
-// with the person's own login token, so row level security still applies.
+// Files one dump. Called by the app right after it saves a dump, with the person's
+// own login token, so row level security still applies. It answers straight away and
+// keeps working in the background, so closing the app mid-way loses nothing.
 import { createClient } from "npm:@supabase/supabase-js@2.117.2";
-import { sortDump } from "../_shared/claude.ts";
+import { processDump } from "../_shared/file.ts";
+
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void };
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -37,20 +40,7 @@ Deno.serve(async (req) => {
     await db.from("profiles").update({ timezone: tz }).eq("user_id", auth.user.id);
   }
 
-  try {
-    const items = await sortDump(dump.body, new Date(), tz);
-    if (items.length) {
-      const { error: insertError } = await db
-        .from("items")
-        .insert(items.map((item) => ({ ...item, dump_id: dump.id, user_id: auth.user!.id })));
-      if (insertError) throw insertError;
-    }
-    await db.from("dumps").update({ processed_at: new Date().toISOString(), error: null }).eq("id", dump.id);
-    return json({ ok: true, items: items.length });
-  } catch (err) {
-    console.error(err);
-    // The raw dump is already saved; record the failure so the app can offer a retry.
-    await db.from("dumps").update({ error: String((err as Error).message ?? err) }).eq("id", dump.id);
-    return json({ error: "Sorting failed, your dump is saved" }, 502);
-  }
+  const userId = auth.user.id;
+  EdgeRuntime.waitUntil(processDump(db, userId, dump, tz).catch(() => {}));
+  return json({ ok: true, accepted: true }, 202);
 });
