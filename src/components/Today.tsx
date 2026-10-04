@@ -1,6 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Capture } from "./Capture";
 import { OutputCard } from "./OutputCard";
+import { Daily } from "./Daily";
+import { Focus } from "./Focus";
+import type { useProfile } from "../lib/profile";
 import type { useLibrary } from "../lib/library";
 import { ItemRow } from "./ItemRow";
 import type { useBrain } from "../lib/items";
@@ -11,11 +14,13 @@ interface Props {
   brain: ReturnType<typeof useBrain>;
   today: ReturnType<typeof usePlan>;
   library: ReturnType<typeof useLibrary>;
+  profileState: ReturnType<typeof useProfile>;
   highlightId: string | null;
   onOpenOutput: (id: string) => void;
 }
 
-export function Today({ brain, today, library, highlightId, onOpenOutput }: Props) {
+export function Today({ brain, today, library, profileState, highlightId, onOpenOutput }: Props) {
+  const [focusing, setFocusing] = useState(false);
   const { items, actions } = brain;
   const { plan, writing, failed, rewrite } = today;
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
@@ -43,7 +48,7 @@ export function Today({ brain, today, library, highlightId, onOpenOutput }: Prop
   // Drafts Claude made in the last few days that haven't been used yet.
   const ready = library.outputs
     .filter((o) => o.status === "draft" && Date.now() - Date.parse(o.updated_at) < 3 * 86_400_000)
-    .slice(0, 4);
+    .slice(0, 3);
   const folderName = (id: string | null) => library.folders.find((f) => f.id === id)?.name ?? null;
 
   const fallback = !plan ? pickNow(items, new Date()) : [];
@@ -59,6 +64,11 @@ export function Today({ brain, today, library, highlightId, onOpenOutput }: Prop
       onArchive={() => void actions.archive(item.id)}
     />
   );
+
+  if (focusing) {
+    const queue = planned.length ? planned.filter((e) => e.item.status !== "done") : fallback.map((item) => ({ item, why: undefined }));
+    return <Focus queue={queue} onDone={(id) => void actions.done(id)} onClose={() => setFocusing(false)} />;
+  }
 
   return (
     <div className="page">
@@ -93,6 +103,11 @@ export function Today({ brain, today, library, highlightId, onOpenOutput }: Prop
         {writing && <p className="muted">Writing today's list from everything you've told me…</p>}
         {failed && !writing && <p className="muted">I couldn't write today's list just now. Here's what looks most pressing.</p>}
 
+        {planned.length > 0 && !allDone && (
+          <button className="pill focus-btn" onClick={() => setFocusing(true)}>
+            🎯 Just show me one thing
+          </button>
+        )}
         {planned.length > 0 && <ol className="list">{planned.map((e) => row(e.item, e.why))}</ol>}
         {allDone && <p className="celebrate">All done for today. That's genuinely great. 🎉</p>}
 
@@ -117,6 +132,8 @@ export function Today({ brain, today, library, highlightId, onOpenOutput }: Prop
           </p>
         )}
       </section>
+
+      <Daily state={profileState} />
     </div>
   );
 }

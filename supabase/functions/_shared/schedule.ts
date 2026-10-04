@@ -31,16 +31,55 @@ export interface Profile {
   timezone: string;
   quiet_start: number;
   quiet_end: number;
-  digest_hour: number;
+  day_start_weekday: number; // minutes after local midnight
+  day_start_weekend: number;
+  weekend_days: number[]; // 0 = Sunday ... 6 = Saturday
   last_digest_on: string | null;
 }
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
 
-/** A reminder that nobody acted on is re-sent this often, up to MAX_NUDGES times in total. */
-export const RENUDGE_AFTER_MS = 2 * HOUR;
+/**
+ * An ignored reminder comes back with growing gaps: 2h, 3h, 5h, then next-day spacing.
+ * Ordinary reminders stop after MAX_NUDGES; a drafted email waiting to be sent keeps
+ * going for longer, because procrastinating on sending is exactly what it's there for.
+ */
+export const RENUDGE_GAPS_MS = [2 * HOUR, 3 * HOUR, 5 * HOUR, 18 * HOUR, 24 * HOUR];
 export const MAX_NUDGES = 3;
+export const MAX_NUDGES_FOR_DRAFT = 6;
+
+export function maxNudges(item: Item): number {
+  return item.output_id ? MAX_NUDGES_FOR_DRAFT : MAX_NUDGES;
+}
+
+export function renudgeGap(nudgeCount: number): number {
+  return RENUDGE_GAPS_MS[Math.min(Math.max(nudgeCount - 1, 0), RENUDGE_GAPS_MS.length - 1)];
+}
+
+function localParts(at: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hour: "numeric",
+    minute: "numeric",
+    weekday: "short",
+    hourCycle: "h23",
+  }).formatToParts(at);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  const day = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(get("weekday"));
+  return { minutes: Number(get("hour")) * 60 + Number(get("minute")), day };
+}
+
+/** Minutes after local midnight. */
+export function localMinutes(at: Date, timeZone: string): number {
+  return localParts(at, timeZone).minutes;
+}
+
+/** When this person's day starts today, in minutes after local midnight. */
+export function dayStart(profile: Profile, now: Date): number {
+  const { day } = localParts(now, profile.timezone);
+  return profile.weekend_days.includes(day) ? profile.day_start_weekend : profile.day_start_weekday;
+}
 
 export function localHour(at: Date, timeZone: string): number {
   const hour = new Intl.DateTimeFormat("en-GB", { timeZone, hour: "numeric", hourCycle: "h23" }).format(at);
@@ -79,19 +118,48 @@ export function dueNudges(items: Item[], now: Date): Nudge[] {
     const last = item.last_nudged_at ? Date.parse(item.last_nudged_at) : null;
     if (last === null || last < remindAt) {
       out.push({ item, reason: "due" });
-    } else if (item.nudge_count < MAX_NUDGES && t - last >= RENUDGE_AFTER_MS) {
+    } else if (item.nudge_count < maxNudges(item) && t - last >= renudgeGap(item.nudge_count)) {
       out.push({ item, reason: "again" });
     }
   }
   return out;
 }
 
-/** True once per local day, at or after the person's digest hour. */
+/** True once per local day, from the moment the person's day starts (workday or weekend time). */
 export function digestDue(profile: Profile, now: Date): boolean {
-  const hour = localHour(now, profile.timezone);
-  if (inQuietHours(hour, profile.quiet_start, profile.quiet_end)) return false;
-  if (hour < profile.digest_hour) return false;
+  if (localMinutes(now, profile.timezone) < dayStart(profile, now)) return false;
   return profile.last_digest_on !== localDate(now, profile.timezone);
+}
+
+/** Once per local day, at or after `minute`, outside quiet hours. */
+export function dailyDue(minute: number, lastOn: string | null, profile: Profile, now: Date): boolean {
+  if (inQuietHours(localHour(now, profile.timezone), profile.quiet_start, profile.quiet_end)) return false;
+  if (localMinutes(now, profile.timezone) < minute) return false;
+  return lastOn !== localDate(now, profile.timezone);
+}
+
+export type PrayerName = "fajr" | "dhuhr" | "asr" | "maghrib" | "isha";
+export interface PrayerTime {
+  name: PrayerName;
+  at: Date;
+}
+
+/** Other nudges hold off for this long after the adhan, so prayer isn't interrupted. */
+export const PRAYER_HOLD_MS = 20 * 60 * 1000;
+
+/** The prayer whose time has just come and hasn't been announced yet. */
+export function prayerDue(times: PrayerTime[], now: Date, lastSentKey: string | null, dateKey: string): PrayerTime | null {
+  const t = now.getTime();
+  for (const p of times) {
+    const at = p.at.getTime();
+    if (at <= t && t - at < PRAYER_HOLD_MS && lastSentKey !== `${dateKey}:${p.name}`) return p;
+  }
+  return null;
+}
+
+export function inPrayerHold(times: PrayerTime[], now: Date): boolean {
+  const t = now.getTime();
+  return times.some((p) => p.at.getTime() <= t && t - p.at.getTime() < PRAYER_HOLD_MS);
 }
 
 function isActive(item: Item, now: Date): boolean {
@@ -182,4 +250,66 @@ export function staleToRetire(items: Item[], now: Date): Item[] {
       !i.folder_id &&
       Date.parse(i.updated_at) < cutoff,
   );
+}
+
+// ---- Cycle tracking ----
+// Dates are local calendar days as "YYYY-MM-DD".
+
+export interface Cycle {
+  started_on: string;
+  ended_on: string | null;
+}
+
+export const DEFAULT_CYCLE_DAYS = 28;
+export const DEFAULT_PERIOD_DAYS = 6;
+
+export function addDays(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+export function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY);
+}
+
+/** Average cycle and period length from recent history, ignoring gaps that look like missed logs. */
+export function cycleStats(cycles: Cycle[]): { cycleDays: number; periodDays: number } {
+  const sorted = [...cycles].sort((a, b) => a.started_on.localeCompare(b.started_on)).slice(-7);
+  const gaps: number[] = [];
+  for (let i = 1; i < sorted.length; i++) {
+    const gap = daysBetween(sorted[i - 1].started_on, sorted[i].started_on);
+    if (gap >= 20 && gap <= 45) gaps.push(gap);
+  }
+  const lengths = sorted
+    .filter((c) => c.ended_on)
+    .map((c) => daysBetween(c.started_on, c.ended_on!) + 1)
+    .filter((n) => n >= 2 && n <= 10);
+  const avg = (xs: number[], fallback: number) => (xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : fallback);
+  return { cycleDays: avg(gaps, DEFAULT_CYCLE_DAYS), periodDays: avg(lengths, DEFAULT_PERIOD_DAYS) };
+}
+
+function latestStart(cycles: Cycle[], today: string): Cycle | null {
+  return [...cycles].filter((c) => c.started_on <= today).sort((a, b) => b.started_on.localeCompare(a.started_on))[0] ?? null;
+}
+
+/** True during a period: from a logged start until its logged end, or the usual length if no end is logged. */
+export function onPeriod(cycles: Cycle[], today: string): boolean {
+  const last = latestStart(cycles, today);
+  if (!last) return false;
+  if (last.ended_on) return today <= last.ended_on;
+  return daysBetween(last.started_on, today) < cycleStats(cycles).periodDays;
+}
+
+/**
+ * Estimated fertile window for the current cycle: ovulation is about 14 days before the
+ * next period, and the window runs from 5 days before ovulation to the day after.
+ * An estimate from logged periods only.
+ */
+export function fertileWindow(cycles: Cycle[], today: string): { start: string; ovulation: string; end: string } | null {
+  const last = latestStart(cycles, today);
+  if (!last) return null;
+  const { cycleDays } = cycleStats(cycles);
+  const ovulation = addDays(last.started_on, cycleDays - 14);
+  return { start: addDays(ovulation, -5), ovulation, end: addDays(ovulation, 1) };
 }

@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   MAX_NUDGES,
+  MAX_NUDGES_FOR_DRAFT,
+  dayStart,
+  cycleStats,
+  onPeriod,
+  fertileWindow,
+  inPrayerHold,
+  prayerDue,
   digestDue,
   dueNudges,
   inQuietHours,
@@ -56,6 +63,13 @@ describe("dueNudges", () => {
     expect(dueNudges([item({ remind_at: hoursAgo(5), last_nudged_at: hoursAgo(1), nudge_count: 1 })], now)).toEqual([]);
   });
 
+  it("keeps chasing an unsent email draft for longer, with growing gaps", () => {
+    const draft = { remind_at: hoursAgo(30), output_id: "o1" };
+    expect(dueNudges([item({ ...draft, last_nudged_at: hoursAgo(19), nudge_count: 4 })], now)[0].reason).toBe("again");
+    expect(dueNudges([item({ ...draft, last_nudged_at: hoursAgo(10), nudge_count: 4 })], now)).toEqual([]);
+    expect(dueNudges([item({ ...draft, last_nudged_at: hoursAgo(30), nudge_count: MAX_NUDGES_FOR_DRAFT })], now)).toEqual([]);
+  });
+
   it("wakes snoozed items whose snooze is over", () => {
     const s = item({ status: "snoozed", snoozed_until: hoursAgo(0.5) });
     expect(dueNudges([s], now)).toEqual([{ item: s, reason: "snooze_over" }]);
@@ -75,13 +89,29 @@ describe("quiet hours and the morning list", () => {
     expect(inQuietHours(14, 13, 15)).toBe(true);
   });
 
-  const profile: Profile = { timezone: "Africa/Cairo", quiet_start: 22, quiet_end: 8, digest_hour: 9, last_digest_on: null };
+  const profile: Profile = {
+    timezone: "Africa/Cairo",
+    quiet_start: 22,
+    quiet_end: 7,
+    day_start_weekday: 465,
+    day_start_weekend: 570,
+    weekend_days: [6, 0],
+    last_digest_on: null,
+  };
 
-  it("sends the morning list once per local day after the chosen hour", () => {
+  it("sends the morning list once per local day after the day starts", () => {
     // 12:00 UTC is 15:00 in Cairo.
     expect(digestDue(profile, now)).toBe(true);
     expect(digestDue({ ...profile, last_digest_on: localDate(now, "Africa/Cairo") }, now)).toBe(false);
-    expect(digestDue({ ...profile, digest_hour: 16 }, now)).toBe(false);
+  });
+
+  it("starts the day later on weekends", () => {
+    // 2026-10-04 is a Sunday. 06:00 UTC is 09:00 in Cairo.
+    const sundayNine = new Date("2026-10-04T06:00:00Z");
+    expect(dayStart(profile, sundayNine)).toBe(570);
+    expect(digestDue(profile, sundayNine)).toBe(false);
+    // Monday 05:00 UTC is 08:00 in Cairo, after the 07:45 workday start.
+    expect(digestDue(profile, new Date("2026-10-05T05:00:00Z"))).toBe(true);
   });
 });
 
@@ -124,5 +154,44 @@ describe("staleToRetire", () => {
       item(),
     ];
     expect(staleToRetire([stale, ...keep], now).map((i) => i.title)).toEqual(["stale"]);
+  });
+});
+
+describe("prayer", () => {
+  const times = [
+    { name: "dhuhr" as const, at: new Date("2026-10-04T08:45:00Z") },
+    { name: "asr" as const, at: new Date("2026-10-04T12:00:00Z") },
+  ];
+  it("announces a prayer once, right when it comes in", () => {
+    const at = new Date("2026-10-04T12:05:00Z");
+    expect(prayerDue(times, at, null, "2026-10-04")?.name).toBe("asr");
+    expect(prayerDue(times, at, "2026-10-04:asr", "2026-10-04")).toBeNull();
+    expect(prayerDue(times, new Date("2026-10-04T12:40:00Z"), null, "2026-10-04")).toBeNull();
+  });
+  it("holds other nudges just after the adhan", () => {
+    expect(inPrayerHold(times, new Date("2026-10-04T12:10:00Z"))).toBe(true);
+    expect(inPrayerHold(times, new Date("2026-10-04T12:30:00Z"))).toBe(false);
+  });
+});
+
+describe("cycle tracking", () => {
+  const cycles = [
+    { started_on: "2026-07-10", ended_on: "2026-07-15" },
+    { started_on: "2026-08-08", ended_on: "2026-08-13" },
+    { started_on: "2026-09-06", ended_on: null },
+  ];
+  it("learns cycle and period length from history", () => {
+    expect(cycleStats(cycles)).toEqual({ cycleDays: 29, periodDays: 6 });
+    expect(cycleStats([])).toEqual({ cycleDays: 28, periodDays: 6 });
+  });
+  it("knows when a period is on, using the logged end or the usual length", () => {
+    expect(onPeriod(cycles, "2026-09-11")).toBe(true);
+    expect(onPeriod(cycles, "2026-09-12")).toBe(false);
+    expect(onPeriod(cycles, "2026-08-13")).toBe(true);
+    expect(onPeriod([], "2026-08-13")).toBe(false);
+  });
+  it("estimates the fertile window around ovulation", () => {
+    // 29-day cycle from 6 Sep: ovulation about 21 Sep.
+    expect(fertileWindow(cycles, "2026-09-15")).toEqual({ start: "2026-09-16", ovulation: "2026-09-21", end: "2026-09-22" });
   });
 });

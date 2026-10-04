@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
   const { dump_id, timezone } = await req.json().catch(() => ({}));
   if (typeof dump_id !== "string") return json({ error: "dump_id required" }, 400);
 
-  const { data: dump, error } = await db.from("dumps").select("id, body, processed_at").eq("id", dump_id).single();
+  const { data: dump, error } = await db.from("dumps").select("id, body, image_paths, processed_at").eq("id", dump_id).single();
   if (error || !dump) return json({ error: "Dump not found" }, 404);
   if (dump.processed_at) return json({ ok: true, already: true });
 

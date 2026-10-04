@@ -1,7 +1,37 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.117.2";
-import { sortDump, writeOutput, type OutputPlan } from "./claude.ts";
+import { sortDump, writeOutput, type DumpImage, type OutputPlan } from "./claude.ts";
+import { encodeBase64 } from "jsr:@std/encoding@1/base64";
 
 const DAY = 86_400_000;
+
+export interface DumpRow {
+  id: string;
+  body: string;
+  image_paths: string[];
+}
+
+const MEDIA_TYPES: Record<string, DumpImage["media_type"]> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  gif: "image/gif",
+};
+
+/** Photos attached to a dump, from the private storage bucket. */
+async function loadImages(db: SupabaseClient, paths: string[]): Promise<DumpImage[]> {
+  const images: DumpImage[] = [];
+  for (const path of paths.slice(0, 6)) {
+    const { data, error } = await db.storage.from("dump-images").download(path);
+    if (error || !data) {
+      console.error("image download failed", path, error);
+      continue;
+    }
+    const ext = path.split(".").pop()?.toLowerCase() ?? "jpg";
+    images.push({ media_type: MEDIA_TYPES[ext] ?? "image/jpeg", data: encodeBase64(new Uint8Array(await data.arrayBuffer())) });
+  }
+  return images;
+}
 
 /** Claims a dump for filing. False if it's done or another run is already on it. */
 export async function claimDump(db: SupabaseClient, dumpId: string, now: Date): Promise<boolean> {
@@ -20,7 +50,7 @@ export async function claimDump(db: SupabaseClient, dumpId: string, now: Date): 
 export async function processDump(
   db: SupabaseClient,
   userId: string,
-  dump: { id: string; body: string },
+  dump: DumpRow,
   timeZone: string,
 ): Promise<FileResult | null> {
   if (!(await claimDump(db, dump.id, new Date()))) return null;
@@ -52,10 +82,11 @@ export interface FileResult {
 export async function fileDump(
   db: SupabaseClient,
   userId: string,
-  dump: { id: string; body: string },
+  dump: DumpRow,
   timeZone: string,
   now: Date,
 ): Promise<FileResult> {
+  const images = await loadImages(db, dump.image_paths ?? []);
   const [folders, outputs, open] = await Promise.all([
     db.from("folders").select("id, name, kind").eq("user_id", userId).eq("archived", false),
     db
@@ -79,7 +110,7 @@ export async function fileDump(
   const folderIds = new Map<string, string>((folders.data ?? []).map((f) => [f.name.toLowerCase(), f.id]));
   const folderNames = new Map<string, string>((folders.data ?? []).map((f) => [f.id, f.name]));
 
-  const sorted = await sortDump(dump.body, now, timeZone, {
+  const sorted = await sortDump(dump.body, images, now, timeZone, {
     folders: (folders.data ?? []).map((f) => ({ name: f.name, kind: f.kind })),
     outputs: (outputs.data ?? []).map((o) => ({
       id: o.id,
@@ -124,7 +155,7 @@ export async function fileDump(
           const { data } = await db.from("outputs").select("content").eq("id", plan.update_output_id).single();
           existing = data?.content ?? null;
         }
-        const written = await writeOutput(plan, dump.body, existing, now, timeZone);
+        const written = await writeOutput(plan, dump.body, images, existing, now, timeZone);
         const row = {
           folder_id: await folderId(plan.folder, plan.folder_kind, plan.folder_area),
           type: plan.type,
@@ -132,6 +163,7 @@ export async function fileDump(
           content: written.content,
           email_to: written.email_to,
           email_subject: written.email_subject,
+          email_account: plan.type === "email" ? plan.email_account ?? "personal" : null,
         };
         if (plan.update_output_id && existing !== null) {
           const { data: prev } = await db.from("outputs").select("source_dump_ids").eq("id", plan.update_output_id).single();
@@ -177,6 +209,23 @@ export async function fileDump(
       .update({ status: "done", completed_at: now.toISOString() })
       .eq("user_id", userId)
       .in("id", sorted.completed_item_ids);
+  }
+
+  for (const e of sorted.cycle_events) {
+    if (e.type === "period_start") {
+      await db.from("cycles").upsert({ user_id: userId, started_on: e.date }, { onConflict: "user_id,started_on" });
+    } else {
+      const { data: open } = await db
+        .from("cycles")
+        .select("id")
+        .eq("user_id", userId)
+        .is("ended_on", null)
+        .lte("started_on", e.date)
+        .order("started_on", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (open) await db.from("cycles").update({ ended_on: e.date }).eq("id", open.id);
+    }
   }
 
   return { items: sorted.items.length, outputs: outputIds.size, completed: sorted.completed_item_ids.length };

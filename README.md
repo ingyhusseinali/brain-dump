@@ -10,6 +10,13 @@ An ADHD-friendly brain-dump app for phone and laptop. Type or say whatever is in
 - **Today's list on the first page.** Each morning Claude writes 3 to 7 things to do, in order, from everything you've dumped. It adds small next steps for goals and life areas that have gone quiet: career, education, money, health, home & family, friends, personal, spiritual, religion.
 - **Follow-ups.** Reminders arrive as notifications, ignored ones come back up to 3 times, snoozes wake up on time, and a morning notification says your list is ready. Quiet hours are respected.
 - **Everything, findable.** Filter by life area or type, search, and see what you finished this week.
+- **English and Egyptian Arabic.** Talk in either (voice toggle EN / عربي); work and formal outputs come out in English.
+- **Photos and screenshots.** Dump a picture of a schedule, flyer or whiteboard and Claude reads it.
+- **Downloads and drafts.** Slides download as PowerPoint. Work emails open in Outlook, personal ones in Gmail; you always send them yourself, and unsent drafts keep getting (varied) reminders.
+- **Faith.** Prayer-time reminders (Egyptian method, from your location), one page of Quran a day with a streak, and other nudges pause around the adhan.
+- **Daily learning.** A 5 to 10 minute bite every day, alternating Sunni Islamic knowledge and general ideas.
+- **Cycle.** Optional tracking pauses prayer reminders during a period and gives a discreet heads-up for the estimated fertile window.
+- **Nudges that don't fade into the background.** Re-nudges change style each time (tiny step, 2-minute timer, why it matters, a choice, a joke), and "Just show me one thing" turns the list into a single card with a timer.
 - **Synced live** between phone and laptop.
 
 ## How it's built
@@ -20,7 +27,7 @@ An ADHD-friendly brain-dump app for phone and laptop. Type or say whatever is in
 | Data, login, sync | Supabase: Postgres with row level security, email-code login, Realtime |
 | `process-dump` function | Claude splits a dump into items (life area, time, priority, folder), drafts or updates slides, notes, emails and documents, and marks done what you said you finished. Runs in the background; the `nudge` job retries anything left over |
 | `plan-today` function | Claude writes today's list, adding steps for neglected goals and areas |
-| `nudge` function | Runs every 5 minutes from a database cron job: reminders, re-nudges, snoozes, morning list, stale-task clean-up |
+| `nudge` function | Runs every 5 minutes from a database cron job: prayer times, reminders and Claude-written re-nudges, snoozes, morning list at the workday or weekend start, learning bite, evening Quran nudge, fertile-window heads-up, stale-task clean-up |
 | Notifications | Web Push. Works on iPhone once the app is added to the Home Screen (iOS 16.4+) |
 
 The shared follow-up rules live in `supabase/functions/_shared/schedule.ts` and are tested in `tests/`.

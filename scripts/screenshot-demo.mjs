@@ -18,9 +18,13 @@ const folders = [
   { id: "f2", name: "Clinic booking app", kind: "project", area: "career", archived: false, updated_at: iso(-3) },
 ];
 const slides = "# Photosynthesis\nThursday Biology · Year 9\n---\n# Why plants need light\n- Light is energy for making food\n- Chlorophyll captures it\n- Happens in the leaves\nNotes:\nAsk: what happens to a plant left in a dark cupboard?\n---\n# The equation\n- Carbon dioxide + water → glucose + oxygen\n- Needs light and chlorophyll\n---\n# Quick activity\n- Pairs: label the leaf diagram\n- 5 minutes, then share";
+const profile = { timezone: "Africa/Cairo", quiet_start: 22, quiet_end: 7, day_start_weekday: 465, day_start_weekend: 570, weekend_days: [6, 0], latitude: 30.04, longitude: 31.24, prayer_reminders: true, prayer_fajr: true, quran_daily: true, quran_page: 112, quran_last_read: null, quran_streak: 4, learning_daily: true, learning_minute: 780, cycle_tracking: true };
+const day = (n) => new Date(now + n * 86400e3).toISOString().slice(0, 10);
+const cycles = [{ id: "c2", started_on: day(-12), ended_on: day(-7) }, { id: "c1", started_on: day(-41), ended_on: day(-36) }];
 const outputs = [
+  { id: "o3", folder_id: null, type: "learning", title: "Why Al-Fatiha is called the Mother of the Book", content: "...", email_to: null, email_subject: null, email_account: null, status: "draft", created_at: iso(-1), updated_at: iso(-1) },
   { id: "o1", folder_id: "f1", type: "slides", title: "Photosynthesis intro slides", content: slides, email_to: null, email_subject: null, status: "draft", created_at: iso(-2), updated_at: iso(-2) },
-  { id: "o2", folder_id: "f2", type: "email", title: "Fix for the double-booking bug", content: "Hi Omar,\n\nWhile driving home I worked out the double-booking issue: we check availability before taking the lock. If we lock the slot first and then check, the race goes away.\n\nCan we pair on it tomorrow morning?\n\nThanks,\nIngy", email_to: "Omar", email_subject: "Idea for the double-booking bug", status: "draft", created_at: iso(-14), updated_at: iso(-14) },
+  { id: "o2", folder_id: "f2", type: "email", title: "Fix for the double-booking bug", content: "Hi Omar,\n\nWhile driving home I worked out the double-booking issue: we check availability before taking the lock. If we lock the slot first and then check, the race goes away.\n\nCan we pair on it tomorrow morning?\n\nThanks,\nIngy", email_to: "Omar", email_subject: "Idea for the double-booking bug", email_account: "work", status: "draft", created_at: iso(-14), updated_at: iso(-14) },
 ];
 const plan = { plan_date: new Date().toISOString().slice(0, 10), headline: "A calm, doable Sunday", generated_at: iso(-2), entries: [
   { item_id: "1", why: "Overdue since this morning, two minutes on the phone" },
@@ -44,21 +48,32 @@ for (const [name, w, h, dark] of [["phone", 390, 844, false], ["phone-dark", 390
     else if (u.includes("/rest/v1/plans")) body = plan;
     else if (u.includes("/rest/v1/dumps")) body = [];
     else if (u.includes("/rest/v1/folders")) body = folders;
+    else if (u.includes("/rest/v1/profiles")) body = profile;
+    else if (u.includes("/rest/v1/cycles")) body = cycles;
     else if (u.includes("/rest/v1/outputs")) body = outputs;
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   });
   const page = await ctx.newPage();
-  await page.goto("http://localhost:4173/");
+  await page.goto("http://localhost:4174/");
   await page.waitForTimeout(1200);
   await page.screenshot({ path: `/tmp/claude-0/shot-${name}.png`, fullPage: true });
   if (name === "phone") {
     await page.getByRole("button", { name: /Folders/ }).click();
     await page.waitForTimeout(400);
     await page.screenshot({ path: `/tmp/claude-0/shot-folders.png`, fullPage: true });
+    await page.getByRole("button", { name: /Settings/ }).click();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `/tmp/claude-0/shot-settings.png`, fullPage: true });
     await page.getByRole("button", { name: /Today/ }).click();
+    await page.getByRole("button", { name: /double-booking/ }).click();
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `/tmp/claude-0/shot-email.png` });
+    await page.getByRole("button", { name: /Back/ }).click();
     await page.getByRole("button", { name: /Photosynthesis/ }).click();
     await page.waitForTimeout(300);
     await page.screenshot({ path: `/tmp/claude-0/shot-slides.png` });
+    const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: /PowerPoint/ }).click()]);
+    await download.saveAs("/tmp/claude-0/demo.pptx");
     await page.getByRole("button", { name: /Present/ }).click();
     await page.waitForTimeout(300);
     await page.getByRole("button", { name: "›" }).click();

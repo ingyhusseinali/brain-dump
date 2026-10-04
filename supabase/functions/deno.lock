@@ -1,10 +1,17 @@
 {
   "version": "5",
   "specifiers": {
+    "jsr:@std/encoding@1": "1.0.11",
     "npm:@anthropic-ai/sdk@0.131.0": "0.131.0_zod@4.6.5",
     "npm:@supabase/supabase-js@2.117.2": "2.117.2",
+    "npm:adhan@4.4.6": "4.4.6",
     "npm:web-push@3.6.7": "3.6.7",
     "npm:zod@4.6.5": "4.6.5"
+  },
+  "jsr": {
+    "@std/encoding@1.0.11": {
+      "integrity": "e7cef2f0b3153bccc17431e7c864a1de03a4b6d9647389c43e08aaa775d37385"
+    }
   },
   "npm": {
     "@anthropic-ai/sdk@0.131.0_zod@4.6.5": {
@@ -69,6 +76,9 @@
         "@supabase/realtime-js",
         "@supabase/storage-js"
       ]
+    },
+    "adhan@4.4.6": {
+      "integrity": "sha512-cpLLcr6qxx+mLc6jgSXJwAAHxDFrhXhVLuzRbZPrpQKIEpJw+0LcfG6u9WEjq66kcTX/2sCkI3VztgRoUXBnFg=="
     },
     "agent-base@7.1.4": {
       "integrity": "sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ=="

@@ -26,7 +26,7 @@ function getRecognition(): (new () => Recognition) | undefined {
  * Where the browser has no speech support, `supported` is false and the app
  * points people to the microphone key on their phone keyboard instead.
  */
-export function useSpeech(onText: (text: string) => void) {
+export function useSpeech(onText: (text: string) => void, lang: string) {
   const Ctor = getRecognition();
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState("");
@@ -43,7 +43,7 @@ export function useSpeech(onText: (text: string) => void) {
     if (!Ctor) return;
     setError(null);
     const r = new Ctor();
-    r.lang = navigator.language || "en-GB";
+    r.lang = lang;
     r.continuous = true;
     r.interimResults = true;
     r.onresult = (e) => {
@@ -65,7 +65,7 @@ export function useSpeech(onText: (text: string) => void) {
     rec.current = r;
     r.start();
     setListening(true);
-  }, [Ctor]);
+  }, [Ctor, lang]);
 
   useEffect(() => () => rec.current?.stop(), []);
 

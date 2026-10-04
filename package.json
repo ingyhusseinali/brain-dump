@@ -12,8 +12,10 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
+    "adhan": "^4.4.6",
     "dompurify": "^3.4.16",
     "marked": "^18.0.14",
+    "pptxgenjs": "^4.0.1",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },

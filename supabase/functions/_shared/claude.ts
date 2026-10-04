@@ -9,6 +9,22 @@ const MODEL = "claude-opus-5-5";
 // Route around a safety-classifier refusal instead of losing the dump.
 const FALLBACK = { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const };
 
+// Ingy talks in English and Egyptian Arabic, often mixed in one breath.
+const LANGUAGE = `Language: they speak English and Egyptian Arabic (often mixed). Understand both, including Arabic written in Latin letters ("franco"). Anything formal or for work (work emails, work documents, slides and materials for teaching or presenting) is written in English unless they explicitly ask otherwise. For personal items, keep the language they used: Egyptian Arabic in Arabic script if they spoke Arabic, English if they spoke English.`;
+
+export interface DumpImage {
+  media_type: "image/jpeg" | "image/png" | "image/webp" | "image/gif";
+  data: string; // base64
+}
+
+function withImages(text: string, images: DumpImage[]) {
+  if (!images.length) return text;
+  return [
+    ...images.map((img) => ({ type: "image" as const, source: { type: "base64" as const, media_type: img.media_type, data: img.data } })),
+    { type: "text" as const, text },
+  ];
+}
+
 const OUTPUT_TYPES = ["slides", "notes", "email", "document", "checklist"] as const;
 const FOLDER_KINDS = ["class", "project", "general"] as const;
 
@@ -34,11 +50,13 @@ const Sorted = z.object({
       folder_kind: z.enum(FOLDER_KINDS),
       folder_area: z.enum(AREAS),
       type: z.enum(OUTPUT_TYPES),
+      email_account: z.enum(["work", "personal"]).nullable(),
       title: z.string(),
       brief: z.string(),
     }),
   ),
   completed_item_ids: z.array(z.string()),
+  cycle_events: z.array(z.object({ type: z.enum(["period_start", "period_end"]), date: z.string() })),
 });
 export type SortResult = z.infer<typeof Sorted>;
 export type SortedItem = SortResult["items"][number];
@@ -63,11 +81,17 @@ const SORT_SYSTEM = `You are the organising brain behind a brain-dump app for so
 - "email" when a work idea or solution needs to be communicated to someone, or they say they should email or message someone.
 - "document" for a proposal, plan, write-up or longer piece.
 - "checklist" for a step-by-step list (packing, preparing an event, a process).
-Only draft an output when it genuinely saves them work; a simple reminder stays a reminder. If an existing output in the same folder covers the same thing (for example today's class slides), update it rather than creating a duplicate: set update_output_id to its id. For each output give: a ref you invent ("o1", "o2"), the folder (required, same rules as above), folder_kind ("class" for a class, course or teaching; "project" for work projects; else "general"), folder_area, type, a clear title, and brief: everything from the dump the writer needs, plus what to produce. When you draft an email to send later, also add a reminder item ("Send the email to Ahmed about the API fix") for the next working morning at 09:00 local unless they said otherwise, with output_ref pointing at the email.
+Only draft an output when it genuinely saves them work; a simple reminder stays a reminder. If an existing output in the same folder covers the same thing (for example today's class slides), update it rather than creating a duplicate: set update_output_id to its id. For an email, set email_account to "work" for anything about their job, colleagues, clients or projects (it goes to Outlook), or "personal" (Gmail); null for other types. For each output give: a ref you invent ("o1", "o2"), the folder (required, same rules as above), folder_kind ("class" for a class, course or teaching; "project" for work projects; else "general"), folder_area, type, a clear title, and brief: everything from the dump the writer needs, plus what to produce. When you draft an email to send later, also add a reminder item ("Send the email to Ahmed about the API fix") for the next working morning at 09:00 local unless they said otherwise, with output_ref pointing at the email.
+
+Photos and screenshots may come with the dump (a schedule, a flyer, a whiteboard, a chat, a receipt, a page of notes). Read them carefully and treat what is in them as part of the dump: dates and times become reminders, content becomes notes or material for outputs.
 
 3. Done things. They never tick things off by hand. If the dump says or clearly implies that something on their open list is done ("sent the email to Ahmed", "finally booked the dentist"), put that item's id in completed_item_ids. Only when you are confident; do not create a new item for something they just reported finishing.
 
-Do not invent things they did not say, do not lecture, and do not drop anything: if part of the dump fits nowhere, keep it as a note.`;
+4. Cycle. If they say their period started or ended (in any wording or language, for example "period started", "جاتلي", "خلصت"), add a cycle_events entry with the local date it happened as YYYY-MM-DD (today unless they say otherwise). Do not also create an item for it. Otherwise cycle_events is empty.
+
+Do not invent things they did not say, do not lecture, and do not drop anything: if part of the dump fits nowhere, keep it as a note.
+
+${LANGUAGE}`;
 
 export interface SortContext {
   folders: { name: string; kind: string }[];
@@ -75,7 +99,13 @@ export interface SortContext {
   openItems: { id: string; title: string }[];
 }
 
-export async function sortDump(body: string, now: Date, timeZone: string, context: SortContext): Promise<SortResult> {
+export async function sortDump(
+  body: string,
+  images: DumpImage[],
+  now: Date,
+  timeZone: string,
+  context: SortContext,
+): Promise<SortResult> {
   const localNow = new Intl.DateTimeFormat("en-GB", {
     timeZone,
     dateStyle: "full",
@@ -91,12 +121,14 @@ export async function sortDump(body: string, now: Date, timeZone: string, contex
     messages: [
       {
         role: "user",
-        content:
+        content: withImages(
           `Current local time: ${localNow} (time zone ${timeZone}, UTC now ${now.toISOString()}).\n\n` +
-          `Existing folders: ${JSON.stringify(context.folders)}\n` +
-          `Recent outputs: ${JSON.stringify(context.outputs)}\n` +
-          `Open items: ${JSON.stringify(context.openItems)}\n\n` +
-          `<dump>\n${body}\n</dump>`,
+            `Existing folders: ${JSON.stringify(context.folders)}\n` +
+            `Recent outputs: ${JSON.stringify(context.outputs)}\n` +
+            `Open items: ${JSON.stringify(context.openItems)}\n\n` +
+            `<dump>\n${body || "(no text, see the attached images)"}\n</dump>`,
+          images,
+        ),
       },
     ],
   });
@@ -117,6 +149,7 @@ export async function sortDump(body: string, now: Date, timeZone: string, contex
       update_output_id: o.update_output_id && knownOutputs.has(o.update_output_id) ? o.update_output_id : null,
     })),
     completed_item_ids: response.parsed_output.completed_item_ids.filter((id) => knownItems.has(id)),
+    cycle_events: response.parsed_output.cycle_events.filter((e) => /^\d{4}-\d{2}-\d{2}$/.test(e.date)),
   };
 }
 
@@ -137,11 +170,14 @@ Format the content as Markdown:
 - checklist: Markdown task list ("- [ ] step"), grouped under headings if long.
 Set email_to and email_subject to null for anything that is not an email.
 
-When an existing version is given, produce the complete updated version that merges the new thoughts in, keeping everything still relevant.`;
+When an existing version is given, produce the complete updated version that merges the new thoughts in, keeping everything still relevant. Attached photos or screenshots are part of their material; use what is in them.
+
+${LANGUAGE}`;
 
 export async function writeOutput(
   plan: Pick<OutputPlan, "type" | "title" | "brief" | "folder">,
   dump: string,
+  images: DumpImage[],
   existing: string | null,
   now: Date,
   timeZone: string,
@@ -156,10 +192,12 @@ export async function writeOutput(
     messages: [
       {
         role: "user",
-        content:
+        content: withImages(
           `Local time: ${localNow}.\nFolder: ${plan.folder}\nType: ${plan.type}\nTitle: ${plan.title}\n\n` +
-          `What to produce:\n${plan.brief}\n\n<their_words>\n${dump}\n</their_words>` +
-          (existing ? `\n\n<existing_version>\n${existing}\n</existing_version>` : ""),
+            `What to produce:\n${plan.brief}\n\n<their_words>\n${dump}\n</their_words>` +
+            (existing ? `\n\n<existing_version>\n${existing}\n</existing_version>` : ""),
+          images,
+        ),
       },
     ],
   });
@@ -192,7 +230,10 @@ The list must feel doable, not overwhelming:
 - Look for what they are missing: a goal with no recent progress, something they mentioned repeatedly, a reminder that keeps getting snoozed, a loose end implied by their notes. For those, add one small, specific next step as a new_task ("Book a 20-minute slot to update CV" rather than "Work on career"). At most 2 new tasks a day, and never duplicate an open item.
 - new_task.title: verb first, at most about 8 words. priority 1 to 3 (1 = most important).
 - why: one short, kind line on why it is on today's list ("Due today", "Moves your fitness goal forward", "Been waiting 9 days, 10 minutes should do it"). Never guilt-trip.
-- headline: a short, warm line for the top of the page, at most 8 words.`;
+- headline: a short, warm line for the top of the page, at most 8 words.
+- Daily Quran reading and the daily learning bite have their own place in the app; do not add them as entries.
+
+${LANGUAGE}`;
 
 export interface PlanInputItem {
   id: string;
@@ -247,4 +288,86 @@ export async function writePlan(
     return Boolean(e.new_task?.title);
   });
   return { headline: response.parsed_output.headline, entries };
+}
+
+const NudgeText = z.object({ title: z.string(), body: z.string() });
+export type NudgeMessage = z.infer<typeof NudgeText>;
+
+const NUDGE_SYSTEM = `You write one phone notification to nudge someone with ADHD about something they have been putting off. Their brain learns to tune out repetitive notifications, so every nudge must feel fresh and be impossible to scroll past, while staying kind. Never guilt-trip, never say "you forgot" or "you still haven't".
+
+Use the style you are given:
+- "plain": the thing itself, clearly.
+- "tiny_step": shrink it to the smallest first action ("Just open the draft. That's the whole job for now.").
+- "timer": invite a 2-minute start ("2 minutes, starting now? Most of it is already written.").
+- "why": connect it to why it matters to them, from the details.
+- "choice": offer an easy choice ("Send it now, or pick a time tonight?").
+- "playful": light humour, a fun comparison, or a single well-placed emoji.
+
+title: at most 6 words, specific to the item (never generic like "Reminder"). body: at most 120 characters. If the item is in Arabic, write the notification in Egyptian Arabic; otherwise English.`;
+
+export const NUDGE_STYLES = ["plain", "tiny_step", "timer", "why", "choice", "playful"] as const;
+
+export async function writeNudge(
+  item: { title: string; details: string | null; kind: string; draft_type: string | null },
+  style: (typeof NUDGE_STYLES)[number],
+  attempt: number,
+): Promise<NudgeMessage> {
+  const response = await client.beta.messages.parse({
+    model: MODEL,
+    max_tokens: 2000,
+    ...FALLBACK,
+    output_config: { effort: "low", format: betaZodOutputFormat(NudgeText) },
+    system: NUDGE_SYSTEM,
+    messages: [
+      {
+        role: "user",
+        content: `Style: ${style}\nThis is nudge number ${attempt} for this item.\nItem: ${JSON.stringify(item)}`,
+      },
+    ],
+  });
+  if (response.stop_reason === "refusal" || !response.parsed_output) throw new Error("Could not write nudge");
+  return response.parsed_output;
+}
+
+const Learning = z.object({
+  title: z.string(),
+  teaser: z.string(),
+  content: z.string(),
+});
+export type LearningBite = z.infer<typeof Learning>;
+
+const LEARNING_SYSTEM = `You write a daily learning bite for a curious, busy person with ADHD who wants to grow intellectually and in their faith for 5 to 10 minutes a day, instead of scrolling. They are a Sunni Muslim from Egypt and work and study in English.
+
+Make it genuinely interesting: open with a hook (a surprising fact, a question, a short story), teach one idea well, then end with "Try this today:" (one tiny action or observation) and "Think about:" (one reflection question). 350 to 600 words, Markdown with short paragraphs and a few headings or bullets. Write in English; Arabic terms, verses and duas also in Arabic script with a translation.
+
+When the track is "faith": teach something from mainstream Sunni Islam. Rotate across: the meaning and context of a Quran verse (cite surah name and verse number), a well-known authentic hadith (cite the collection, such as Sahih al-Bukhari or Sahih Muslim; only use hadith you are certain are authentic and well known, and never invent wording), one of the Names of Allah, a story from the Seerah or the prophets, a companion's life, a practical point of worship or manners, a dua and its meaning, Islamic history and civilisation. Stay respectful and accurate; where scholars differ on a ruling, say so briefly and suggest asking a trusted scholar rather than taking a side.
+
+When the track is "general": rotate across science, history, psychology and how the brain works, philosophy and ideas, economics and money, language and words, art and design, technology, health science, great books. Sometimes link it to their interests if given.
+
+Never repeat a recent topic. title: at most 8 words. teaser: one line under 100 characters that makes them want to read it now.`;
+
+export async function writeLearning(
+  track: "faith" | "general",
+  recentTitles: string[],
+  interests: string[],
+  now: Date,
+): Promise<LearningBite> {
+  const response = await client.beta.messages.parse({
+    model: MODEL,
+    max_tokens: 16000,
+    ...FALLBACK,
+    output_config: { effort: "medium", format: betaZodOutputFormat(Learning) },
+    system: LEARNING_SYSTEM,
+    messages: [
+      {
+        role: "user",
+        content:
+          `Track: ${track}\nDate: ${now.toDateString()}\n` +
+          `Recent topics (do not repeat): ${recentTitles.join("; ") || "none yet"}\n` +
+          `Their interests: ${interests.join(", ") || "unknown yet"}`,
+      },
+    ],
+  });
+  if (response.stop_reason === "refusal" || !response.parsed_output) throw new Error("Could not write learning bite");
+  return response.parsed_output;
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Markdown } from "./Markdown";
-import { OUTPUT_LABEL, splitSlides, type Output } from "../lib/library";
+import { OUTPUT_LABEL, composeLinks, splitSlides, type Output } from "../lib/library";
+import { downloadPptx } from "../lib/pptx";
 
 interface Props {
   output: Output;
@@ -21,12 +22,15 @@ export function OutputView({ output, folderName, onClose, onDone }: Props) {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  const mailto =
-    output.type === "email"
-      ? `mailto:${encodeURIComponent(output.email_to?.includes("@") ? output.email_to : "")}?subject=${encodeURIComponent(
-          output.email_subject ?? output.title,
-        )}&body=${encodeURIComponent(output.content)}`
-      : null;
+  const [downloading, setDownloading] = useState(false);
+  async function download() {
+    setDownloading(true);
+    try {
+      await downloadPptx(output);
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   if (presenting) return <Presenter output={output} onExit={() => setPresenting(false)} />;
 
@@ -40,7 +44,7 @@ export function OutputView({ output, folderName, onClose, onDone }: Props) {
       </header>
       <div className="sheet-body">
         <p className="eyebrow">{OUTPUT_LABEL[output.type]}</p>
-        <h1>{output.title}</h1>
+        <h1 dir="auto">{output.title}</h1>
         <p className="muted">Updated {new Date(output.updated_at).toLocaleString(undefined, { weekday: "short", hour: "numeric", minute: "2-digit" })}</p>
 
         <div className="row-actions">
@@ -49,17 +53,23 @@ export function OutputView({ output, folderName, onClose, onDone }: Props) {
               ▶ Present
             </button>
           )}
-          {mailto && (
-            <a className="primary" href={mailto}>
-              Open in Mail
-            </a>
+          {output.type === "slides" && (
+            <button className="pill" onClick={() => void download()} disabled={downloading}>
+              {downloading ? "Preparing…" : "⬇ PowerPoint"}
+            </button>
           )}
+          {output.type === "email" &&
+            composeLinks(output).map((l) => (
+              <a key={l.label} className={l.primary ? "primary" : "pill"} href={l.href} target="_blank" rel="noreferrer">
+                {l.label}
+              </a>
+            ))}
           <button className="pill" onClick={() => void copy()}>
             {copied ? "Copied ✓" : "Copy"}
           </button>
           {output.status !== "done" && (
             <button className="pill quiet" onClick={onDone}>
-              {output.type === "email" ? "Sent it" : "Done with this"}
+              {output.type === "email" ? "I sent it" : output.type === "learning" ? "Read it ✓" : "Done with this"}
             </button>
           )}
         </div>

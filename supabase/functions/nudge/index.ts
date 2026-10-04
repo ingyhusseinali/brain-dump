@@ -1,29 +1,66 @@
 // The follow-up engine. A database cron job calls this every 5 minutes.
-// It sends due reminders, re-nudges ignored ones, wakes snoozed items,
-// and sends one gentle daily digest per person.
+// Per person it: files any dump left behind, retires stale tasks, announces prayer times,
+// sends due and ignored reminders (with fresh wording each time), sends the morning list,
+// the daily learning bite and an evening Quran nudge.
 import { createClient } from "npm:@supabase/supabase-js@2.117.2";
 import { sendToUser } from "../_shared/push.ts";
 import { buildPlan } from "../_shared/plan.ts";
 import { processDump } from "../_shared/file.ts";
+import { prayerTimesFor } from "../_shared/prayer.ts";
+import { NUDGE_STYLES, writeLearning, writeNudge } from "../_shared/claude.ts";
 import {
+  dailyDue,
+  fertileWindow,
+  onPeriod,
+  type Cycle,
   digestDue,
   dueNudges,
+  inPrayerHold,
   inQuietHours,
   localDate,
   localHour,
+  localMinutes,
+  prayerDue,
   staleToRetire,
   type Item,
   type Nudge,
+  type PrayerTime,
   type Profile,
 } from "../_shared/schedule.ts";
 
 const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-function nudgeText(n: Nudge): { title: string; body: string } {
+interface FullProfile extends Profile {
+  user_id: string;
+  latitude: number | null;
+  longitude: number | null;
+  prayer_reminders: boolean;
+  prayer_fajr: boolean;
+  last_prayer_sent: string | null;
+  quran_daily: boolean;
+  quran_page: number;
+  quran_last_read: string | null;
+  last_quran_nudge_on: string | null;
+  learning_daily: boolean;
+  learning_minute: number;
+  last_learning_on: string | null;
+  cycle_tracking: boolean;
+  last_fertile_nudge_for: string | null;
+}
+
+const PRAYER_LABEL: Record<string, [string, string]> = {
+  fajr: ["Fajr", "الفجر"],
+  dhuhr: ["Dhuhr", "الظهر"],
+  asr: ["Asr", "العصر"],
+  maghrib: ["Maghrib", "المغرب"],
+  isha: ["Isha", "العشاء"],
+};
+
+function templateText(n: Nudge): { title: string; body: string } {
   const { item } = n;
   switch (n.reason) {
     case "due":
-      return { title: item.kind === "reminder" ? "Reminder" : "Heads up", body: item.title };
+      return { title: item.output_id ? "Ready to send" : item.kind === "reminder" ? "Now's the time" : "Heads up", body: item.title };
     case "again":
       return { title: "Still on your list", body: `${item.title}. Done, or snooze it?` };
     case "snooze_over":
@@ -31,11 +68,30 @@ function nudgeText(n: Nudge): { title: string; body: string } {
   }
 }
 
-async function runForUser(userId: string, profile: Profile, items: Item[], now: Date) {
+/** Re-nudges get fresh, varied wording so they don't blur into background noise. */
+async function nudgeText(n: Nudge, draftType: string | null): Promise<{ title: string; body: string }> {
+  if (n.reason !== "again") return templateText(n);
+  const style = NUDGE_STYLES[(n.item.nudge_count + n.item.title.length) % NUDGE_STYLES.length];
+  try {
+    return await writeNudge(
+      { title: n.item.title, details: n.item.details, kind: n.item.kind, draft_type: draftType },
+      style,
+      n.item.nudge_count + 1,
+    );
+  } catch (err) {
+    console.error("nudge text fell back to template", err);
+    return templateText(n);
+  }
+}
+
+async function runForUser(profile: FullProfile, items: Item[], now: Date) {
+  const userId = profile.user_id;
+  const today = localDate(now, profile.timezone);
+
   // Safety net: file any dump the app saved but couldn't get filed (closed too soon, no signal).
   const { data: waiting } = await db
     .from("dumps")
-    .select("id, body")
+    .select("id, body, image_paths")
     .eq("user_id", userId)
     .is("processed_at", null)
     .is("error", null)
@@ -52,37 +108,151 @@ async function runForUser(userId: string, profile: Profile, items: Item[], now: 
   }
 
   const quiet = inQuietHours(localHour(now, profile.timezone), profile.quiet_start, profile.quiet_end);
-  const nowIso = now.toISOString();
 
-  for (const n of dueNudges(items, now)) {
-    if (n.reason === "snooze_over") {
-      // Wake it up even during quiet hours so it shows in the app; only the notification waits.
-      await db.from("items").update({ status: "open", snoozed_until: null }).eq("id", n.item.id);
-      n.item.status = "open";
+  let cycles: Cycle[] = [];
+  if (profile.cycle_tracking) {
+    const { data } = await db.from("cycles").select("started_on, ended_on").eq("user_id", userId);
+    cycles = data ?? [];
+  }
+  const period = profile.cycle_tracking && onPeriod(cycles, today);
+
+  // Prayer times. Other nudges wait a little after each adhan.
+  let prayers: PrayerTime[] = [];
+  // During a period, prayer reminders pause.
+  if (profile.prayer_reminders && !period && profile.latitude !== null && profile.longitude !== null) {
+    prayers = prayerTimesFor(profile.latitude, profile.longitude, profile.timezone, now);
+    const due = prayerDue(prayers, now, profile.last_prayer_sent, today);
+    if (due && (!quiet || (due.name === "fajr" && profile.prayer_fajr))) {
+      const [en, ar] = PRAYER_LABEL[due.name];
+      await db.from("profiles").update({ last_prayer_sent: `${today}:${due.name}` }).eq("user_id", userId);
+      await sendToUser(db, userId, { title: `${ar} · ${en}`, body: `It's time for ${en}. 🤍`, tag: "prayer" });
     }
-    if (quiet) continue;
-    const text = nudgeText(n);
-    await sendToUser(db, userId, { ...text, url: n.item.output_id ? `?output=${n.item.output_id}` : `?item=${n.item.id}`, tag: n.item.id });
-    await db
-      .from("items")
-      .update({ last_nudged_at: nowIso, nudge_count: n.reason === "again" ? n.item.nudge_count + 1 : 1 })
-      .eq("id", n.item.id);
+  }
+  const holdForPrayer = inPrayerHold(prayers, now);
+
+  // Reminders.
+  if (!quiet && !holdForPrayer) {
+    const drafts = new Map<string, string>();
+    const outputIds = items.map((i) => i.output_id).filter((id): id is string => !!id);
+    if (outputIds.length) {
+      const { data } = await db.from("outputs").select("id, type").in("id", outputIds);
+      for (const o of data ?? []) drafts.set(o.id, o.type);
+    }
+    for (const n of dueNudges(items, now)) {
+      if (n.reason === "snooze_over") {
+        await db.from("items").update({ status: "open", snoozed_until: null }).eq("id", n.item.id);
+        n.item.status = "open";
+      }
+      const text = await nudgeText(n, n.item.output_id ? drafts.get(n.item.output_id) ?? null : null);
+      await sendToUser(db, userId, {
+        ...text,
+        url: n.item.output_id ? `?output=${n.item.output_id}` : `?item=${n.item.id}`,
+        tag: n.item.id,
+      });
+      await db
+        .from("items")
+        .update({ last_nudged_at: now.toISOString(), nudge_count: n.reason === "again" ? n.item.nudge_count + 1 : 1 })
+        .eq("id", n.item.id);
+    }
+  } else {
+    // Snoozes still wake up so they show in the app; only the notification waits.
+    const woken = dueNudges(items, now).filter((n) => n.reason === "snooze_over");
+    if (woken.length) {
+      await db.from("items").update({ status: "open", snoozed_until: null }).in("id", woken.map((n) => n.item.id));
+    }
   }
 
+  // Morning: today's list, written when the day starts (workday or weekend time).
   if (digestDue(profile, now)) {
     // Mark first so a slow or failed Claude call never causes a double morning message.
-    await db.from("profiles").update({ last_digest_on: localDate(now, profile.timezone) }).eq("user_id", userId);
-    if (!items.length) return;
-    const { plan } = await buildPlan(db, userId, profile.timezone, now);
-    if (!plan.entries.length) return;
-    const count = plan.entries.length;
+    await db.from("profiles").update({ last_digest_on: today }).eq("user_id", userId);
+    const { plan } = items.length ? await buildPlan(db, userId, profile.timezone, now) : { plan: null };
+    const count = plan?.entries.length ?? 0;
+    const quran = profile.quran_daily ? ` Plus page ${profile.quran_page} of Quran.` : "";
+    if (count || quran) {
+      await sendToUser(db, userId, {
+        title: plan?.headline ?? "Good morning",
+        body: count ? `Your list is ready: ${count} ${count === 1 ? "thing" : "things"}, one at a time.${quran}` : quran.trim(),
+        url: "?view=today",
+        tag: "digest",
+      });
+    }
+  }
+
+  // Daily learning bite, alternating faith and general knowledge.
+  if (profile.learning_daily && !holdForPrayer && dailyDue(profile.learning_minute, profile.last_learning_on, profile, now)) {
+    await db.from("profiles").update({ last_learning_on: today }).eq("user_id", userId);
+    await sendLearningBite(userId, items, now);
+  }
+
+  // Evening Quran nudge if today's page isn't read yet: after Isha when prayer times are on, else 20:30.
+  const isha = prayers.find((p) => p.name === "isha");
+  const quranAfter = isha ? localMinutes(new Date(isha.at.getTime() + 30 * 60_000), profile.timezone) : 20 * 60 + 30;
+  if (
+    profile.quran_daily &&
+    profile.quran_last_read !== today &&
+    !holdForPrayer &&
+    dailyDue(quranAfter, profile.last_quran_nudge_on, profile, now)
+  ) {
+    await db.from("profiles").update({ last_quran_nudge_on: today }).eq("user_id", userId);
     await sendToUser(db, userId, {
-      title: plan.headline,
-      body: `Your list for today is ready: ${count} ${count === 1 ? "thing" : "things"}, one at a time.`,
+      title: "📖 Your page for today",
+      body: period
+        ? `Listen to page ${profile.quran_page} or do some dhikr, about 5 minutes. 🤍`
+        : `Page ${profile.quran_page}, about 5 minutes. A calm way to end the day.`,
       url: "?view=today",
-      tag: "digest",
+      tag: "quran",
     });
   }
+
+  // Fertile window heads-up, once per cycle, after the day starts. Worded discreetly for the lock screen.
+  if (profile.cycle_tracking && !quiet) {
+    const window = fertileWindow(cycles, today);
+    if (window && today >= window.start && today <= window.end && profile.last_fertile_nudge_for !== window.start) {
+      await db.from("profiles").update({ last_fertile_nudge_for: window.start }).eq("user_id", userId);
+      await sendToUser(db, userId, {
+        title: "🌸 A gentle heads-up",
+        body: "Your likely fertile days are here. Tap for the dates.",
+        url: "?view=today",
+        tag: "cycle",
+      });
+    }
+  }
+}
+
+async function sendLearningBite(userId: string, items: Item[], now: Date) {
+  const dayNumber = Math.floor(now.getTime() / 86_400_000);
+  const track = dayNumber % 2 === 0 ? "faith" : "general";
+
+  const { data: recent } = await db
+    .from("outputs")
+    .select("title")
+    .eq("user_id", userId)
+    .eq("type", "learning")
+    .order("created_at", { ascending: false })
+    .limit(30);
+  const interests = [...new Set(items.filter((i) => i.kind === "goal" || i.kind === "idea").map((i) => i.title))].slice(0, 10);
+  const bite = await writeLearning(track, (recent ?? []).map((r) => r.title), interests, now);
+
+  let { data: folder } = await db.from("folders").select("id").eq("user_id", userId).ilike("name", "Daily learning").maybeSingle();
+  if (!folder) {
+    ({ data: folder } = await db
+      .from("folders")
+      .insert({ user_id: userId, name: "Daily learning", kind: "general", area: "education" })
+      .select("id")
+      .single());
+  }
+  const { data: output } = await db
+    .from("outputs")
+    .insert({ user_id: userId, folder_id: folder?.id ?? null, type: "learning", title: bite.title, content: bite.content })
+    .select("id")
+    .single();
+  await sendToUser(db, userId, {
+    title: track === "faith" ? "🌙 5 minutes for your soul" : "🧠 5 minutes for your brain",
+    body: bite.teaser,
+    url: output ? `?output=${output.id}` : "?view=today",
+    tag: "learning",
+  });
 }
 
 Deno.serve(async (req) => {
@@ -91,20 +261,14 @@ Deno.serve(async (req) => {
   if (!ok) return new Response("Forbidden", { status: 403 });
 
   const now = new Date();
-  const { data: profiles, error } = await db
-    .from("profiles")
-    .select("user_id, timezone, quiet_start, quiet_end, digest_hour, last_digest_on");
+  const { data: profiles, error } = await db.from("profiles").select("*");
   if (error) return new Response(error.message, { status: 500 });
 
   const results: Record<string, string> = {};
-  for (const p of profiles ?? []) {
-    const { data: items } = await db
-      .from("items")
-      .select("*")
-      .eq("user_id", p.user_id)
-      .in("status", ["open", "snoozed"]);
+  for (const p of (profiles ?? []) as FullProfile[]) {
+    const { data: items } = await db.from("items").select("*").eq("user_id", p.user_id).in("status", ["open", "snoozed"]);
     try {
-      await runForUser(p.user_id, p, (items ?? []) as Item[], now);
+      await runForUser(p, (items ?? []) as Item[], now);
       results[p.user_id] = "ok";
     } catch (err) {
       console.error("nudge failed for", p.user_id, err);

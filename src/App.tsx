@@ -5,6 +5,7 @@ import { registerServiceWorker } from "./lib/push";
 import { useBrain } from "./lib/items";
 import { usePlan } from "./lib/plan";
 import { useLibrary } from "./lib/library";
+import { useProfile } from "./lib/profile";
 import { Folders } from "./components/Folders";
 import { OutputView } from "./components/OutputView";
 import { Login } from "./components/Login";
@@ -48,6 +49,7 @@ function SignedIn({ userId, email }: { userId: string; email: string }) {
   const brain = useBrain(userId);
   const today = usePlan(userId);
   const library = useLibrary(userId);
+  const profileState = useProfile(userId);
   const [outputId, setOutputId] = useState<string | null>(() => new URLSearchParams(location.search).get("output"));
   const output = library.outputs.find((o) => o.id === outputId);
 
@@ -83,11 +85,18 @@ function SignedIn({ userId, email }: { userId: string; email: string }) {
     <>
       <main>
         {view === "today" && (
-          <Today brain={brain} today={today} library={library} highlightId={highlightId} onOpenOutput={setOutputId} />
+          <Today
+            brain={brain}
+            today={today}
+            library={library}
+            profileState={profileState}
+            highlightId={highlightId}
+            onOpenOutput={setOutputId}
+          />
         )}
         {view === "folders" && <Folders brain={brain} library={library} onOpenOutput={setOutputId} />}
         {view === "all" && <Everything brain={brain} />}
-        {view === "settings" && <Settings userId={userId} email={email} />}
+        {view === "settings" && <Settings state={profileState} email={email} />}
       </main>
       <nav className="tabs" aria-label="Sections">
         {(

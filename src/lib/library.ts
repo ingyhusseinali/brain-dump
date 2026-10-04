@@ -11,7 +11,7 @@ export interface Folder {
   updated_at: string;
 }
 
-export type OutputType = "slides" | "notes" | "email" | "document" | "checklist";
+export type OutputType = "slides" | "notes" | "email" | "document" | "checklist" | "learning";
 
 export interface Output {
   id: string;
@@ -21,6 +21,7 @@ export interface Output {
   content: string;
   email_to: string | null;
   email_subject: string | null;
+  email_account: "work" | "personal" | null;
   status: "draft" | "done" | "archived";
   created_at: string;
   updated_at: string;
@@ -88,6 +89,7 @@ export const OUTPUT_ICON: Record<OutputType, string> = {
   email: "✉️",
   document: "📄",
   checklist: "☑️",
+  learning: "🌱",
 };
 
 export const OUTPUT_LABEL: Record<OutputType, string> = {
@@ -96,6 +98,7 @@ export const OUTPUT_LABEL: Record<OutputType, string> = {
   email: "Email draft",
   document: "Document",
   checklist: "Checklist",
+  learning: "Today's learning",
 };
 
 /** Slides are stored as Markdown separated by a line containing only ---. */
@@ -108,4 +111,27 @@ export function splitSlides(content: string): { body: string; notes: string }[] 
       const [body, ...notes] = s.split(/^Notes:\s*$/im);
       return { body: body.trim(), notes: notes.join("\n").trim() };
     });
+}
+
+const isIos = () => /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+/**
+ * Links that open the draft in the right app, ready to send. Ingy sends work email from
+ * Outlook and personal email from Gmail; on iPhone the apps open directly.
+ */
+export function composeLinks(o: Output): { label: string; href: string; primary: boolean }[] {
+  const to = o.email_to?.includes("@") ? o.email_to : "";
+  const subject = o.email_subject ?? o.title;
+  const e = encodeURIComponent;
+  const outlook = isIos()
+    ? `ms-outlook://compose?to=${e(to)}&subject=${e(subject)}&body=${e(o.content)}`
+    : `https://outlook.office.com/mail/deeplink/compose?to=${e(to)}&subject=${e(subject)}&body=${e(o.content)}`;
+  const gmail = isIos()
+    ? `googlegmail:///co?to=${e(to)}&subject=${e(subject)}&body=${e(o.content)}`
+    : `https://mail.google.com/mail/?view=cm&fs=1&to=${e(to)}&su=${e(subject)}&body=${e(o.content)}`;
+  const work = o.email_account !== "personal";
+  return [
+    { label: "Open in Outlook", href: outlook, primary: work },
+    { label: "Open in Gmail", href: gmail, primary: !work },
+  ].sort((a, b) => Number(b.primary) - Number(a.primary));
 }
