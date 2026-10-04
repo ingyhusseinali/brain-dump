@@ -97,7 +97,7 @@ export function Today({ brain, today, library, profileState, highlightId, onOpen
       )}
 
       <section className="today" aria-labelledby="today-title">
-        <header className="today-head">
+        <header className="today-head today-hero">
           <div>
             <p className="eyebrow">{new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}</p>
             <h1 id="today-title">{plan?.headline ?? "Today"}</h1>

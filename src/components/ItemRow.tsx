@@ -25,7 +25,7 @@ export function ItemRow({ item, why, highlight, onDone, onReopen, onSnooze, onAr
   const checkable = item.kind === "task" || item.kind === "reminder" || item.kind === "goal";
 
   return (
-    <li className={`item ${done ? "is-done" : ""} ${highlight ? "is-highlight" : ""}`}>
+    <li className={`item area-${item.area} ${done ? "is-done" : ""} ${highlight ? "is-highlight" : ""}`}>
       <div className="item-main">
         {checkable ? (
           <button
@@ -43,7 +43,7 @@ export function ItemRow({ item, why, highlight, onDone, onReopen, onSnooze, onAr
         <button className="item-body" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
           <span className="item-title">{item.title}</span>
           <span className="item-meta">
-            <span className="chip">
+            <span className="chip area-chip">
               {AREA_ICON[item.area]} {AREA_LABEL[item.area]}
             </span>
             {item.kind !== "task" && <span className="chip subtle">{KIND_LABEL[item.kind]}</span>}

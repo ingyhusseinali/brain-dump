@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Markdown } from "./Markdown";
+import { RecipeView } from "./RecipeView";
 import { OUTPUT_LABEL, composeLinks, splitSlides, type Output } from "../lib/library";
 import { downloadPptx } from "../lib/pptx";
 
@@ -36,7 +37,7 @@ export function OutputView({ output, folderName, onClose, onDone, onCooked }: Pr
   if (presenting) return <Presenter output={output} onExit={() => setPresenting(false)} />;
 
   return (
-    <div className="sheet" role="dialog" aria-modal="true" aria-label={output.title}>
+    <div className={`sheet type-${output.type}`} role="dialog" aria-modal="true" aria-label={output.title}>
       <header className="sheet-head">
         <button className="link" onClick={onClose}>
           ‹ Back
@@ -102,6 +103,8 @@ export function OutputView({ output, folderName, onClose, onDone, onCooked }: Pr
               </li>
             ))}
           </ol>
+        ) : output.type === "recipe" ? (
+          <RecipeView output={output} />
         ) : (
           <Markdown className="doc" text={output.content} />
         )}

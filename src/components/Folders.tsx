@@ -30,9 +30,12 @@ export function Folders({ brain, library, onOpenOutput }: Props) {
         <button className="link" onClick={() => setOpenId(null)}>
           ‹ All folders
         </button>
-        <h1>
-          {AREA_ICON[folder.area]} {folder.name}
-        </h1>
+        <header className={`folder-hero area-${folder.area}`}>
+          <span className="folder-hero-icon" aria-hidden>
+            {AREA_ICON[folder.area]}
+          </span>
+          <h1>{folder.name}</h1>
+        </header>
         {outputs.length > 0 && (
           <>
             <h2 className="section-title">Prepared for you</h2>
@@ -81,7 +84,7 @@ export function Folders({ brain, library, onOpenOutput }: Props) {
                 const open = brain.items.filter((i) => i.folder_id === f.id && i.status === "open").length;
                 return (
                   <li key={f.id}>
-                    <button className="output-card" onClick={() => setOpenId(f.id)}>
+                    <button className={`output-card folder-card area-${f.area}`} onClick={() => setOpenId(f.id)}>
                       <span className="output-icon" aria-hidden>
                         {AREA_ICON[f.area]}
                       </span>

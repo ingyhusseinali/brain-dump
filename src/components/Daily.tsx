@@ -51,7 +51,7 @@ export function Daily({ state, outputs, onOpenOutput }: { state: ProfileState; o
   return (
     <section className="daily" aria-label="Daily">
       {profile.quran_daily && (
-        <div className={`daily-card ${readToday ? "is-done" : ""}`}>
+        <div className={`daily-card daily-quran ${readToday ? "is-done" : ""}`}>
           <div>
             <p className="daily-title">
               📖 {period ? "Listen to" : "Quran"} · page {readToday ? profile.quran_page - 1 || 604 : profile.quran_page}
@@ -92,14 +92,14 @@ export function Daily({ state, outputs, onOpenOutput }: { state: ProfileState; o
       )}
 
       {prayer && (
-        <div className="daily-card">
+        <div className="daily-card daily-prayer">
           <p className="daily-title">🕌 Next: {prayer.name}</p>
           <p className="muted small">{fmtTime(prayer.at)}</p>
         </div>
       )}
 
       {profile.cycle_tracking && (
-        <div className="daily-card">
+        <div className="daily-card daily-cycle">
           <div>
             {period ? (
               <>
@@ -146,7 +146,7 @@ export function Daily({ state, outputs, onOpenOutput }: { state: ProfileState; o
 
 function MealCard({ meal, thinking, onOpen, onSuggest }: { meal: Output | null; thinking: boolean; onOpen: (id: string) => void; onSuggest: () => void }) {
   return (
-    <div className="daily-card">
+    <div className="daily-card daily-meal">
       <div>
         <p className="daily-title" dir="auto">🍳 {meal ? `Tonight: ${meal.title}` : "What to cook today"}</p>
         <p className="muted small">{meal ? (meal.last_cooked_on ? "A favourite from your recipes" : "Ingredients and steps inside") : "One clear idea, from your saved recipes or something simple"}</p>

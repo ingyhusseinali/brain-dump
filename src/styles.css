@@ -169,7 +169,7 @@ a.pill { text-decoration: none; display: inline-flex; align-items: center; color
 .welcome { background: var(--accent-soft); border-radius: var(--radius); padding: 16px; }
 .welcome p { margin: 6px 0 0; }
 
-.demo-banner { padding: 8px 16px; font-size: 13px; text-align: center; background: #2f6f5e; color: #fff; }
+.demo-banner { padding: 8px 16px; font-size: 13px; text-align: center; background: linear-gradient(90deg, #7c5cff, #e64bc4); color: #fff; }
 
 /* Money */
 .stack { display: flex; flex-direction: column; gap: 10px; }
@@ -193,26 +193,181 @@ a.pill { text-decoration: none; display: inline-flex; align-items: center; color
 .card.is-done { border-color: var(--good); }
 
 /* Calendar */
-.cal-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
-.cal-nav { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; text-align: center; }
-.cal-nav .link { text-align: center; font-weight: 600; }
-.cal-cycle { margin: 0; padding: 8px 12px; border-radius: 12px; font-size: 0.9rem; }
-.cal-cycle.is-period, .swatch.is-period, .month-day.is-period { background: color-mix(in srgb, var(--warn) 14%, transparent); }
-.cal-cycle.is-fertile, .swatch.is-fertile, .month-day.is-fertile { background: color-mix(in srgb, var(--good) 16%, transparent); }
-.timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.tl-row { width: 100%; display: grid; grid-template-columns: 4.8rem auto 1fr; gap: 10px; align-items: start; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; color: inherit; font: inherit; }
-.tl-row:disabled { opacity: 1; background: transparent; border-style: dashed; }
-.tl-row.is-done .tl-text { text-decoration: line-through; opacity: 0.6; }
-.tl-time { color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; padding-top: 2px; }
-.tl-text { min-width: 0; overflow-wrap: anywhere; }
-.now-line { color: var(--accent); font-size: 0.8rem; font-weight: 600; border-top: 2px solid var(--accent); padding-top: 2px; margin: 4px 0; }
-.month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
-.month-wd { text-align: center; font-size: 0.75rem; color: var(--muted); }
-.month-day { aspect-ratio: 1; min-width: 0; max-width: 100%; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: inherit; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 0; }
-.month-day.is-today { border: 2px solid var(--accent); font-weight: 700; }
-.month-count { min-width: 1.2rem; padding: 0 4px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 0.7rem; line-height: 1.2rem; }
+:root { --area-career: #4b6bfb; --area-education: #8b5cf6; --area-money: #0f9f6e; --area-health: #16a34a; --area-home_family: #e46b2c; --area-friends: #db2777; --area-personal: #0891b2; --area-spiritual: #7c8a9e; --area-religion: #b08a1e; --period: #e5484d; --fertile: #2f9e6a; }
+@media (prefers-color-scheme: dark) { :root { --area-career: #8ea2ff; --area-education: #b69cff; --area-money: #4fd1a1; --area-health: #5fd38a; --area-home_family: #ff9a5c; --area-friends: #f472b6; --area-personal: #4cc9e0; --area-spiritual: #a5b0c0; --area-religion: #e2c35a; --period: #ff6b6f; --fertile: #5fd39b; } }
+.area-career { --c: var(--area-career); } .area-education { --c: var(--area-education); } .area-money { --c: var(--area-money); }
+.area-health { --c: var(--area-health); } .area-home_family { --c: var(--area-home_family); } .area-friends { --c: var(--area-friends); }
+.area-personal { --c: var(--area-personal); } .area-spiritual { --c: var(--area-spiritual); } .area-religion { --c: var(--area-religion); }
+.cal { gap: 14px; }
+.cal-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.cal-title { background: none; border: 0; padding: 0; font: inherit; font-size: 1.6rem; font-weight: 700; color: inherit; }
+.cal-title span { color: var(--accent); font-size: 1rem; }
+.week { display: grid; grid-template-columns: 1.6rem repeat(7, minmax(0, 1fr)) 1.6rem; gap: 2px; align-items: center; }
+.week-arrow { background: none; border: 0; color: var(--muted); font-size: 1.4rem; padding: 6px 0; }
+.week-day, .month-day { background: none; border: 0; color: inherit; font: inherit; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 0; border-radius: 14px; min-width: 0; }
+.week-wd { font-size: 0.72rem; color: var(--muted); }
+.week-num { width: 2.1rem; height: 2.1rem; display: grid; place-items: center; border-radius: 999px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.is-today .week-num { color: var(--accent); }
+.is-selected .week-num { background: var(--accent); color: #fff; }
+.dots { display: flex; gap: 3px; height: 6px; align-items: center; }
+.dot { width: 6px; height: 6px; border-radius: 999px; background: var(--c, var(--accent)); display: inline-block; }
+.dot-cycle { width: 10px; height: 3px; border-radius: 2px; display: inline-block; }
+.dot-cycle.is-period { background: var(--period); }
+.dot-cycle.is-fertile { background: var(--fertile); }
+.cal-day-title { margin: 4px 0 -10px; font-size: 1.15rem; }
+.cal-summary { margin: 0; }
+.cal-note { margin: 0; padding: 8px 12px; border-radius: 12px; font-size: 0.88rem; }
+.cal-note.is-period { background: color-mix(in srgb, var(--period) 12%, transparent); }
+.cal-note.is-fertile { background: color-mix(in srgb, var(--fertile) 14%, transparent); }
+.anytime { display: flex; flex-direction: column; gap: 6px; }
+.anytime-row { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--c); }
+.anytime-row input { width: 20px; height: 20px; accent-color: var(--c); flex: none; }
+.anytime-row.is-done span { text-decoration: line-through; color: var(--muted); }
+.daygrid { position: relative; border-top: 1px solid var(--line); }
+.hour { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line); height: 0; }
+.hour span { position: absolute; top: -0.6rem; left: 0; width: 3.2rem; padding-right: 6px; text-align: right; font-size: 0.72rem; color: var(--muted); background: var(--bg); }
+.prayer-line { position: absolute; left: 3.6rem; right: 0; border-top: 1px dashed color-mix(in srgb, var(--area-religion) 60%, transparent); }
+.prayer-line span { position: absolute; right: 0; top: -0.62rem; font-size: 0.7rem; color: var(--area-religion); background: var(--bg); padding-left: 6px; }
+.routine { position: absolute; left: 3.6rem; font-size: 0.72rem; color: var(--muted); transform: translateY(-50%); background: var(--bg); padding-right: 6px; }
+.event { position: absolute; border-radius: 10px; background: color-mix(in srgb, var(--c) 14%, var(--surface)); border-left: 4px solid var(--c); overflow: visible; z-index: 1; }
+.event.is-done { opacity: 0.5; }
+.event.is-done .event-title { text-decoration: line-through; }
+.event-body { width: 100%; height: 100%; background: none; border: 0; color: inherit; font: inherit; text-align: left; padding: 4px 8px; display: flex; flex-direction: column; overflow: hidden; }
+.event-title { font-size: 0.86rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.event-time { font-size: 0.72rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.event-actions { position: absolute; top: 100%; left: 0; z-index: 3; display: flex; gap: 6px; padding: 6px; margin-top: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 6px 20px rgb(0 0 0 / 0.12); }
+.now { position: absolute; left: 3.2rem; right: 0; border-top: 2px solid var(--period); z-index: 2; }
+.now span { position: absolute; left: -5px; top: -6px; width: 10px; height: 10px; border-radius: 999px; background: var(--period); }
+.month { display: flex; flex-direction: column; gap: 6px; }
+.month-nav { display: flex; justify-content: space-between; margin-top: -8px; }
+.month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.month-wd { text-align: center; font-size: 0.72rem; color: var(--muted); }
 .legend { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.dot, .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 999px; }
-.dot { background: var(--accent); }
-.swatch { border-radius: 4px; }
-.tl-actions { display: flex; gap: 8px; padding: 6px 0 4px 5.8rem; flex-wrap: wrap; }
+
+/* ---------- Colourful theme: every life area, draft type and daily card has its own colour ---------- */
+:root {
+  --bg: #fbf8ff;
+  --surface: #ffffff;
+  --text: #1f1a2e;
+  --muted: #6e6787;
+  --line: #ece6f5;
+  --accent: #6d4aff;
+  --accent-soft: #efeaff;
+  --good: #12a36b;
+  --warn: #f2542d;
+  --radius: 20px;
+  --shadow: 0 2px 10px rgb(80 50 160 / 0.07), 0 1px 2px rgb(80 50 160 / 0.06);
+  --grad: linear-gradient(135deg, #ff7eb3 0%, #ff9a5a 35%, #ffd166 65%, #7bdcb5 100%);
+  --t-slides: #ff7a45; --t-notes: #f7b500; --t-email: #3d7bff; --t-document: #7a5cff; --t-checklist: #12a36b;
+  --t-learning: #19b5a5; --t-recipe: #ff6b4a; --t-content: #e64bc4;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14111c;
+    --surface: #1f1a2b;
+    --text: #f3effa;
+    --muted: #a69ebd;
+    --line: #2f2840;
+    --accent: #a48bff;
+    --accent-soft: #2b2347;
+    --good: #4fd6a0;
+    --warn: #ff7f5e;
+    --shadow: 0 2px 10px rgb(0 0 0 / 0.3);
+    --t-slides: #ff9a6e; --t-notes: #ffd35a; --t-email: #7aa5ff; --t-document: #a994ff; --t-checklist: #4fd6a0;
+    --t-learning: #4fd8ca; --t-recipe: #ff8d73; --t-content: #f27ad8;
+  }
+}
+body { font-family: "Nunito", ui-rounded, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+h1 { font-weight: 900; letter-spacing: -0.02em; }
+h2, .item-title, .daily-title { font-weight: 800; }
+.section-title { color: var(--text); font-size: 1rem; font-weight: 800; }
+.card, .item, .output-card, .daily-card, .capture, .doc, .slide-card { border-color: transparent; box-shadow: var(--shadow); }
+
+/* Capture: a rainbow edge so it's the most inviting thing on screen */
+.capture { border: 2px solid transparent; background: linear-gradient(var(--surface), var(--surface)) padding-box, var(--grad) border-box; }
+.primary { background: linear-gradient(135deg, #7c5cff, #e64bc4); box-shadow: 0 4px 14px rgb(124 92 255 / 0.35); }
+.pill.is-on { background: var(--accent); }
+
+/* Today: a sunny hero */
+.today-hero { background: var(--grad); color: #2b1d0e; border-radius: var(--radius); padding: 18px; margin-bottom: 4px; }
+.today-hero .eyebrow { color: rgb(43 29 14 / 0.7); }
+.today-hero .progress { background: rgb(255 255 255 / 0.75); color: #2b1d0e; font-size: 1.1rem; }
+.welcome { background: var(--grad); color: #2b1d0e; }
+
+/* Items: colour by life area */
+.item { border-left: 6px solid var(--c, var(--accent)); background: linear-gradient(90deg, color-mix(in srgb, var(--c, var(--accent)) 9%, var(--surface)), var(--surface) 55%); }
+.check { border-color: var(--c, var(--accent)); border-width: 3px; }
+.is-done .check { background: var(--c, var(--good)); border-color: var(--c, var(--good)); }
+.chip { border: 0; background: color-mix(in srgb, var(--muted) 12%, transparent); font-weight: 700; }
+.area-chip { background: color-mix(in srgb, var(--c) 18%, transparent); color: color-mix(in srgb, var(--c) 75%, var(--text)); }
+.chip.when { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+
+/* Drafts and folders: colour by type or area, icon in a coloured tile */
+.type-slides { --c: var(--t-slides); } .type-notes { --c: var(--t-notes); } .type-email { --c: var(--t-email); }
+.type-document { --c: var(--t-document); } .type-checklist { --c: var(--t-checklist); } .type-learning { --c: var(--t-learning); }
+.type-recipe { --c: var(--t-recipe); } .type-content { --c: var(--t-content); }
+.output-card { background: linear-gradient(120deg, color-mix(in srgb, var(--c, var(--accent)) 14%, var(--surface)), var(--surface) 70%); }
+.output-icon { width: 46px; height: 46px; display: grid; place-items: center; border-radius: 14px; background: color-mix(in srgb, var(--c, var(--accent)) 22%, var(--surface)); font-size: 1.5rem; }
+.chev { color: var(--c, var(--muted)); font-weight: 800; }
+.folder-hero { display: flex; align-items: center; gap: 14px; padding: 18px; border-radius: var(--radius); background: linear-gradient(135deg, color-mix(in srgb, var(--c) 30%, var(--surface)), color-mix(in srgb, var(--c) 8%, var(--surface))); }
+.folder-hero h1 { margin: 0; }
+.folder-hero-icon { font-size: 2.2rem; width: 60px; height: 60px; display: grid; place-items: center; border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
+.sheet .eyebrow { color: var(--c, var(--muted)); font-weight: 800; }
+
+/* Daily cards each get a mood */
+.daily-card { border-left: 6px solid var(--c); background: linear-gradient(110deg, color-mix(in srgb, var(--c) 16%, var(--surface)), var(--surface) 75%); }
+.daily-quran { --c: #12a36b; } .daily-prayer { --c: #c99a1c; } .daily-meal { --c: #ff6b4a; } .daily-cycle { --c: #ff5fa2; }
+.daily-card .pill { border: 0; background: color-mix(in srgb, var(--c) 18%, var(--surface)); font-weight: 700; }
+
+/* Tabs: each section has its own colour when active */
+.tabs { border-top: 0; box-shadow: 0 -4px 20px rgb(80 50 160 / 0.08); }
+.tabs button { font-weight: 700; }
+.tab-today { --c: #ff8a00; } .tab-calendar { --c: #3d7bff; } .tab-folders { --c: #f7b500; } .tab-money { --c: #12a36b; } .tab-all { --c: #7a5cff; } .tab-settings { --c: #6e6787; }
+.tabs button.is-on { color: var(--c); }
+.tabs button.is-on span { transform: scale(1.15); transition: transform 0.2s; }
+.tabs button.is-on::after { content: ""; width: 22px; height: 4px; border-radius: 99px; background: var(--c); margin-top: 2px; }
+
+/* Money: categories in colour */
+.cat-groceries { --c: #12a36b; } .cat-eating_out { --c: #ff8a00; } .cat-home { --c: #e46b2c; } .cat-bills { --c: #f7b500; }
+.cat-transport { --c: #3d7bff; } .cat-health { --c: #19b5a5; } .cat-personal_care { --c: #ff5fa2; } .cat-clothes { --c: #b14bff; }
+.cat-family { --c: #ff6b4a; } .cat-gifts { --c: #e64bc4; } .cat-charity { --c: #c99a1c; } .cat-education { --c: #7a5cff; }
+.cat-subscriptions { --c: #5a6bff; } .cat-travel { --c: #00a6d6; } .cat-other { --c: #8b84a3; }
+.cat-row .bar span { background: var(--c); }
+.money-summary { background: linear-gradient(135deg, color-mix(in srgb, #12a36b 18%, var(--surface)), var(--surface) 70%); }
+.money-big { font-weight: 900; }
+
+/* Recipes */
+.recipe { display: flex; flex-direction: column; gap: 18px; }
+.recipe-hero { position: relative; height: 190px; border-radius: 24px; overflow: hidden; background: linear-gradient(135deg, #ffb36b, #ff6b4a 55%, #ff4f8b) center / cover; display: grid; place-items: center; box-shadow: var(--shadow); }
+.recipe-hero-dish { font-size: 5.5rem; filter: drop-shadow(0 6px 12px rgb(0 0 0 / 0.25)); z-index: 1; }
+.recipe-hero-float { position: absolute; inset: 0; }
+.recipe-hero-float span { position: absolute; font-size: 1.9rem; opacity: 0.9; animation: bob 3s ease-in-out infinite; }
+.recipe-hero-float span:nth-child(1) { left: 8%; top: 14%; } .recipe-hero-float span:nth-child(2) { right: 10%; top: 12%; }
+.recipe-hero-float span:nth-child(3) { left: 14%; bottom: 14%; } .recipe-hero-float span:nth-child(4) { right: 14%; bottom: 16%; }
+.recipe-hero-float span:nth-child(5) { left: 34%; top: 6%; } .recipe-hero-float span:nth-child(6) { right: 32%; bottom: 6%; }
+@keyframes bob { 50% { transform: translateY(-6px) rotate(6deg); } }
+@media (prefers-reduced-motion: reduce) { .recipe-hero-float span { animation: none; } }
+.recipe-meta { display: flex; flex-wrap: wrap; gap: 8px; }
+.recipe-chip { padding: 6px 12px; border-radius: 999px; font-weight: 800; background: color-mix(in srgb, var(--t-recipe) 16%, var(--surface)); color: color-mix(in srgb, var(--t-recipe) 70%, var(--text)); }
+.recipe-section-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
+.recipe-section-head h2 { margin: 0; font-size: 1.25rem; }
+.ingredient-grid { list-style: none; margin: 0 0 8px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; }
+.ingredient { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 8px; border: 0; border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); color: inherit; font: inherit; text-align: center; transition: transform 0.15s; }
+.ingredient:active { transform: scale(0.96); }
+.ingredient-pic { font-size: 2.2rem; width: 60px; height: 60px; display: grid; place-items: center; border-radius: 999px; background: color-mix(in srgb, var(--t-recipe) 12%, var(--surface)); }
+.ingredient-name { font-weight: 700; font-size: 0.88rem; line-height: 1.2; }
+.ingredient-amount { font-size: 0.8rem; color: var(--muted); }
+.ingredient.is-have { background: color-mix(in srgb, var(--good) 14%, var(--surface)); }
+.ingredient.is-have .ingredient-name { text-decoration: line-through; color: var(--muted); }
+.step-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.step-card { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; padding: 14px; border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
+.step-num { width: 34px; height: 34px; border-radius: 999px; display: grid; place-items: center; font-weight: 900; color: #fff; background: linear-gradient(135deg, #ff9a5a, #ff4f8b); }
+.step-timer { grid-column: 2; justify-self: start; font-size: 0.8rem; font-weight: 800; padding: 2px 10px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+.cook { position: fixed; inset: 0; z-index: 30; background: linear-gradient(160deg, color-mix(in srgb, #ff9a5a 22%, var(--bg)), var(--bg) 60%); display: flex; flex-direction: column; gap: 16px; padding: calc(12px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom)); }
+.cook-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.cook-progress { display: flex; gap: 4px; }
+.cook-progress span { flex: 1; height: 6px; border-radius: 99px; background: var(--line); }
+.cook-progress span.is-on { background: linear-gradient(90deg, #ff9a5a, #ff4f8b); }
+.cook-step { flex: 1; margin: 0; font-size: clamp(1.4rem, 5.5vw, 2.2rem); font-weight: 800; line-height: 1.35; overflow-y: auto; }
+.cook-timer { align-self: center; border: 0; border-radius: 999px; padding: 14px 24px; font: inherit; font-weight: 900; font-size: 1.2rem; background: var(--surface); color: var(--accent); box-shadow: var(--shadow); }
+.cook-nav { display: flex; justify-content: space-between; gap: 12px; }

@@ -24,6 +24,7 @@ export interface Output {
   email_account: "work" | "personal" | null;
   status: "draft" | "done" | "archived";
   last_cooked_on?: string | null;
+  source_dump_ids?: string[] | null;
   created_at: string;
   updated_at: string;
 }

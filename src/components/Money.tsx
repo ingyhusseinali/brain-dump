@@ -76,7 +76,7 @@ export function Money({ money, profileState, brain }: Props) {
             {categories.map(([cat, amount]) => {
               const limit = catBudgets[cat];
               return (
-                <div key={cat} className="cat-row">
+                <div key={cat} className={`cat-row cat-${cat}`}>
                   <div className="cat-head">
                     <span>{CATEGORY_LABEL[cat] ?? cat}</span>
                     <span className="num">

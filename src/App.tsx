@@ -127,7 +127,7 @@ function SignedIn({ userId, email }: { userId: string; email: string }) {
             ["settings", "⚙️", "Settings"],
           ] as const
         ).map(([v, icon, label]) => (
-          <button key={v} className={view === v ? "is-on" : ""} onClick={() => setView(v)} aria-current={view === v ? "page" : undefined}>
+          <button key={v} className={`tab-${v} ${view === v ? "is-on" : ""}`} onClick={() => setView(v)} aria-current={view === v ? "page" : undefined}>
             <span aria-hidden>{icon}</span>
             {label}
           </button>
