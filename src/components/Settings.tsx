@@ -198,7 +198,7 @@ export function Settings({ state, email }: { state: ReturnType<typeof useProfile
             <h2>Learning</h2>
             <Toggle
               label="A 5-minute learning bite every day"
-              hint="Alternates between your faith and new ideas: science, history, psychology and more."
+              hint="Rotates between your faith, new ideas (science, history, psychology and more) and, if set below, exam prep with practice questions."
               checked={profile.learning_daily}
               onChange={(v) => void save({ learning_daily: v })}
             />
@@ -206,6 +206,18 @@ export function Settings({ state, email }: { state: ReturnType<typeof useProfile
               <label className="field">
                 Arrives at
                 <input type="time" value={toTime(profile.learning_minute)} onChange={(e) => void save({ learning_minute: fromTime(e.target.value) })} />
+              </label>
+            )}
+            {profile.learning_daily && (
+              <label className="field">
+                Studying for
+                <input
+                  type="text"
+                  dir="auto"
+                  placeholder="e.g. PMP, SAP Activate"
+                  defaultValue={profile.study_topics}
+                  onBlur={(e) => e.target.value !== profile.study_topics && void save({ study_topics: e.target.value })}
+                />
               </label>
             )}
           </section>

@@ -360,14 +360,17 @@ When the track is "faith": teach something from mainstream Sunni Islam. Rotate a
 
 When the track is "general": rotate across science, history, psychology and how the brain works, philosophy and ideas, economics and money, language and words, art and design, technology, health science, great books. Sometimes link it to their interests if given.
 
+When the track is "study": they are preparing for professional certifications (the topics are given). Write a short exam-prep lesson on one concept from the official body of knowledge for one of those topics, explain it plainly, give a realistic example from an SAP implementation project they might manage, then end with 3 exam-style multiple-choice questions and, under a final "Answers" heading, the answers with one-line explanations. Rotate across the topics and through the syllabus over time; stick to well-established content and do not invent exam codes or statistics.
+
 Never repeat a recent topic. title: at most 8 words. teaser: one line under 100 characters that makes them want to read it now.`;
 
 export async function writeLearning(
-  track: "faith" | "general",
+  track: "faith" | "general" | "study",
   recentTitles: string[],
   interests: string[],
   now: Date,
   aboutMe = "",
+  studyTopics = "",
 ): Promise<LearningBite> {
   const response = await client.beta.messages.parse({
     model: MODEL,
@@ -380,6 +383,7 @@ export async function writeLearning(
         role: "user",
         content:
           `Track: ${track}\nDate: ${now.toDateString()}\n` +
+          (studyTopics ? `Study topics: ${studyTopics}\n` : "") +
           `Recent topics (do not repeat): ${recentTitles.join("; ") || "none yet"}\n` +
           `Their interests: ${interests.join(", ") || "unknown yet"}` +
           aboutBlock(aboutMe),

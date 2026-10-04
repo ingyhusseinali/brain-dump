@@ -21,6 +21,7 @@ export interface Profile {
   learning_minute: number;
   cycle_tracking: boolean;
   about_me: string;
+  study_topics: string;
 }
 
 /** The person's settings and cycle history, shared by Today and Settings. */

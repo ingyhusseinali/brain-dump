@@ -72,3 +72,6 @@ alter table public.profiles add column last_fertile_nudge_for date; -- window st
 -- What Claude knows about this person's life (jobs, studies, people, commitments).
 -- Grows from what they dump and can be edited in Settings.
 alter table public.profiles add column about_me text not null default '' check (length(about_me) <= 6000);
+
+-- Certifications or subjects to study in small daily bites (e.g. "PMP, SAP Activate").
+alter table public.profiles add column study_topics text not null default '';

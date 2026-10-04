@@ -46,6 +46,7 @@ interface FullProfile extends Profile {
   last_learning_on: string | null;
   cycle_tracking: boolean;
   about_me: string;
+  study_topics: string;
   last_fertile_nudge_for: string | null;
 }
 
@@ -183,7 +184,7 @@ async function runForUser(profile: FullProfile, items: Item[], now: Date) {
   // Daily learning bite, alternating faith and general knowledge.
   if (profile.learning_daily && !holdForPrayer && dailyDue(profile.learning_minute, profile.last_learning_on, profile, now)) {
     await db.from("profiles").update({ last_learning_on: today }).eq("user_id", userId);
-    await sendLearningBite(userId, items, now, profile.about_me);
+    await sendLearningBite(userId, items, now, profile.about_me, profile.study_topics);
   }
 
   // Evening Quran nudge if today's page isn't read yet: after Isha when prayer times are on, else 20:30.
@@ -221,9 +222,11 @@ async function runForUser(profile: FullProfile, items: Item[], now: Date) {
   }
 }
 
-async function sendLearningBite(userId: string, items: Item[], now: Date, aboutMe: string) {
+async function sendLearningBite(userId: string, items: Item[], now: Date, aboutMe: string, studyTopics: string) {
+  // Rotate faith and general knowledge, plus certification study when they have topics set.
   const dayNumber = Math.floor(now.getTime() / 86_400_000);
-  const track = dayNumber % 2 === 0 ? "faith" : "general";
+  const tracks = studyTopics.trim() ? (["faith", "study", "general"] as const) : (["faith", "general"] as const);
+  const track = tracks[dayNumber % tracks.length];
 
   const { data: recent } = await db
     .from("outputs")
@@ -233,7 +236,7 @@ async function sendLearningBite(userId: string, items: Item[], now: Date, aboutM
     .order("created_at", { ascending: false })
     .limit(30);
   const interests = [...new Set(items.filter((i) => i.kind === "goal" || i.kind === "idea").map((i) => i.title))].slice(0, 10);
-  const bite = await writeLearning(track, (recent ?? []).map((r) => r.title), interests, now, aboutMe);
+  const bite = await writeLearning(track, (recent ?? []).map((r) => r.title), interests, now, aboutMe, studyTopics);
 
   let { data: folder } = await db.from("folders").select("id").eq("user_id", userId).ilike("name", "Daily learning").maybeSingle();
   if (!folder) {
@@ -249,7 +252,7 @@ async function sendLearningBite(userId: string, items: Item[], now: Date, aboutM
     .select("id")
     .single();
   await sendToUser(db, userId, {
-    title: track === "faith" ? "🌙 5 minutes for your soul" : "🧠 5 minutes for your brain",
+    title: track === "faith" ? "🌙 5 minutes for your soul" : track === "study" ? "🎓 5 minutes closer to certified" : "🧠 5 minutes for your brain",
     body: bite.teaser,
     url: output ? `?output=${output.id}` : "?view=today",
     tag: "learning",
