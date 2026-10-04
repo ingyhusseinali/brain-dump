@@ -1,11 +1,16 @@
 import webpush from "npm:web-push@3.6.7";
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.117.2";
 
-webpush.setVapidDetails(
-  Deno.env.get("VAPID_SUBJECT") ?? "mailto:brain-dump@example.com",
-  Deno.env.get("VAPID_PUBLIC_KEY")!,
-  Deno.env.get("VAPID_PRIVATE_KEY")!,
-);
+// Without notification keys (Claude's own rounds in the free setup) nothing is sent;
+// the follow-up engine, which has them, sends the reminders.
+const configured = Boolean(Deno.env.get("VAPID_PUBLIC_KEY") && Deno.env.get("VAPID_PRIVATE_KEY"));
+if (configured) {
+  webpush.setVapidDetails(
+    Deno.env.get("VAPID_SUBJECT") ?? "mailto:brain-dump@example.com",
+    Deno.env.get("VAPID_PUBLIC_KEY")!,
+    Deno.env.get("VAPID_PRIVATE_KEY")!,
+  );
+}
 
 export interface PushMessage {
   title: string;
@@ -16,6 +21,7 @@ export interface PushMessage {
 
 /** Sends to every device the person has enabled. Returns how many deliveries succeeded. */
 export async function sendToUser(db: SupabaseClient, userId: string, message: PushMessage): Promise<number> {
+  if (!configured) return 0;
   const { data: subs, error } = await db
     .from("push_subscriptions")
     .select("id, endpoint, p256dh, auth")

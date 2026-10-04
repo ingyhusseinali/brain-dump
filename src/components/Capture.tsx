@@ -16,6 +16,9 @@ function savedLang(): string {
 }
 
 /** The one thing that must always be effortless: getting a thought out of your head. */
+/** Free setup: no Claude API key, so Claude files dumps on hourly rounds instead of instantly. */
+export const FREE_MODE = import.meta.env.VITE_FREE_MODE === "1";
+
 export function Capture() {
   const [text, setText] = useState("");
   const [images, setImages] = useState<string[]>([]);
@@ -71,7 +74,7 @@ export function Capture() {
     setUsedVoice(false);
     const result = await saveDump(body, usedVoice ? "voice" : "text", photos);
     setQueued(queuedCount());
-    setToast(result === "saved" ? "Got it. I'll put it all in its place." : "Saved on this device. I'll sync it when you're back online.");
+    setToast(result === "saved" ? (FREE_MODE ? "Got it! Claude puts it in its place on the next hourly round. 🌈" : "Got it. I'll put it all in its place.") : "Saved on this device. I'll sync it when you're back online.");
     box.current?.focus();
   }
 

@@ -3,11 +3,78 @@ import { betaZodOutputFormat } from "npm:@anthropic-ai/sdk@0.131.0/helpers/beta/
 import { z } from "npm:zod@4.6.5";
 import { AREAS } from "./schedule.ts";
 
-const client = new Anthropic(); // reads ANTHROPIC_API_KEY
 const MODEL = "claude-opus-5-5";
 
 // Route around a safety-classifier refusal instead of losing the dump.
 const FALLBACK = { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" as const };
+
+/**
+ * Thrown when there is no Claude API key. The free setup has none: Claude in the
+ * project files dumps and writes lists on a schedule instead (see _here/run.ts),
+ * so callers leave the work waiting rather than recording a failure.
+ */
+export class NoAIError extends Error {
+  constructor() {
+    super("No Claude API key; waiting for Claude to pick this up");
+  }
+}
+
+type Content = string | ReturnType<typeof withImages>;
+
+export interface AskRequest {
+  system: string;
+  content: Content;
+  /** JSON Schema of the answer, for whoever answers without the API. */
+  jsonSchema: unknown;
+  /** Why the previous answer was rejected, when retrying. */
+  problem?: string;
+}
+
+/** Answers requests some other way than the Claude API (see _here/run.ts). */
+let answerer: ((req: AskRequest) => Promise<unknown>) | null = null;
+export function answerWith(fn: typeof answerer) {
+  answerer = fn;
+}
+
+let client: Anthropic | null = null;
+
+/** One structured Claude call: the system prompt, their material, and the shape of the answer. */
+async function ask<S extends z.ZodType>(req: {
+  schema: S;
+  effort: "low" | "medium" | "high";
+  maxTokens: number;
+  system: string;
+  failure: string;
+  content: Content;
+}): Promise<z.infer<S>> {
+  if (answerer) {
+    // Give whoever answers a couple of chances to fix an answer that doesn't fit the schema.
+    let problem: string | undefined;
+    for (let attempt = 0; ; attempt++) {
+      const answer = await answerer({ system: req.system, content: req.content, jsonSchema: z.toJSONSchema(req.schema), problem });
+      const checked = req.schema.safeParse(answer);
+      if (checked.success) return checked.data;
+      problem = checked.error.message;
+      if (attempt >= 2) throw new Error(`${req.failure}: ${problem}`);
+    }
+  }
+  if (!Deno.env.get("ANTHROPIC_API_KEY")) throw new NoAIError();
+  client ??= new Anthropic();
+  const response = await client.beta.messages.parse({
+    model: MODEL,
+    max_tokens: req.maxTokens,
+    ...FALLBACK,
+    output_config: { effort: req.effort, format: betaZodOutputFormat(req.schema) },
+    system: req.system,
+    messages: [{ role: "user", content: req.content }],
+  });
+  if (response.stop_reason === "refusal" || !response.parsed_output) {
+    throw new Error(`${req.failure} (stop_reason: ${response.stop_reason})`);
+  }
+  return response.parsed_output as z.infer<S>;
+}
+
+export const hasAI = () => answerer !== null || Boolean(Deno.env.get("ANTHROPIC_API_KEY"));
 
 // Ingy talks in English and Egyptian Arabic, often mixed in one breath.
 const LANGUAGE = `Language: they speak English and Egyptian Arabic (often mixed). Understand both, including Arabic written in Latin letters ("franco"). Anything formal or for work (work emails, work documents, slides and materials for teaching or presenting) is written in English unless they explicitly ask otherwise. For personal items, keep the language they used: Egyptian Arabic in Arabic script if they spoke Arabic, English if they spoke English.`;
@@ -150,16 +217,13 @@ export async function sortDump(
     timeStyle: "long",
   }).format(now);
 
-  const response = await client.beta.messages.parse({
-    model: MODEL,
-    max_tokens: 16000,
-    ...FALLBACK,
-    output_config: { effort: "medium", format: betaZodOutputFormat(Sorted) },
+  const parsed = await ask({
+    schema: Sorted,
+    effort: "medium",
+    maxTokens: 16000,
     system: SORT_SYSTEM,
-    messages: [
-      {
-        role: "user",
-        content: withImages(
+    failure: `Could not sort dump`,
+    content: withImages(
           `Current local time: ${localNow} (time zone ${timeZone}, UTC now ${now.toISOString()}).\n\n` +
             `Existing folders: ${JSON.stringify(context.folders)}\n` +
             `Recent outputs: ${JSON.stringify(context.outputs)}\n` +
@@ -169,31 +233,25 @@ export async function sortDump(
             aboutBlock(context.aboutMe),
           images,
         ),
-      },
-    ],
   });
-
-  if (response.stop_reason === "refusal" || !response.parsed_output) {
-    throw new Error(`Could not sort dump (stop_reason: ${response.stop_reason})`);
-  }
   const knownOutputs = new Set(context.outputs.map((o) => o.id));
   const knownItems = new Set(context.openItems.map((i) => i.id));
   return {
-    items: response.parsed_output.items.map((item) => ({
+    items: parsed.items.map((item) => ({
       ...item,
       priority: Math.min(3, Math.max(1, item.priority)),
       remind_at: item.remind_at && !Number.isNaN(Date.parse(item.remind_at)) ? new Date(item.remind_at).toISOString() : null,
     })),
-    outputs: response.parsed_output.outputs.map((o) => ({
+    outputs: parsed.outputs.map((o) => ({
       ...o,
       update_output_id: o.update_output_id && knownOutputs.has(o.update_output_id) ? o.update_output_id : null,
     })),
-    completed_item_ids: response.parsed_output.completed_item_ids.filter((id) => knownItems.has(id)),
-    about_me_additions: response.parsed_output.about_me_additions,
-    cycle_events: response.parsed_output.cycle_events.filter((e) => /^\d{4}-\d{2}-\d{2}$/.test(e.date)),
-    money_entries: response.parsed_output.money_entries.filter((m) => m.amount > 0 && /^\d{4}-\d{2}-\d{2}$/.test(m.date)),
-    new_savings_goals: response.parsed_output.new_savings_goals.filter((g) => g.target > 0),
-    budget: response.parsed_output.budget,
+    completed_item_ids: parsed.completed_item_ids.filter((id) => knownItems.has(id)),
+    about_me_additions: parsed.about_me_additions,
+    cycle_events: parsed.cycle_events.filter((e) => /^\d{4}-\d{2}-\d{2}$/.test(e.date)),
+    money_entries: parsed.money_entries.filter((m) => m.amount > 0 && /^\d{4}-\d{2}-\d{2}$/.test(m.date)),
+    new_savings_goals: parsed.new_savings_goals.filter((g) => g.target > 0),
+    budget: parsed.budget,
   };
 }
 
@@ -230,29 +288,21 @@ export async function writeOutput(
   aboutMe = "",
 ): Promise<WrittenOutput> {
   const localNow = new Intl.DateTimeFormat("en-GB", { timeZone, dateStyle: "full", timeStyle: "short" }).format(now);
-  const response = await client.beta.messages.parse({
-    model: MODEL,
-    max_tokens: 32000,
-    ...FALLBACK,
-    output_config: { effort: "medium", format: betaZodOutputFormat(Written) },
+  const parsed = await ask({
+    schema: Written,
+    effort: "medium",
+    maxTokens: 32000,
     system: WRITE_SYSTEM,
-    messages: [
-      {
-        role: "user",
-        content: withImages(
+    failure: `Could not write ${plan.type}`,
+    content: withImages(
           `Local time: ${localNow}.\nFolder: ${plan.folder}\nType: ${plan.type}\nTitle: ${plan.title}\n\n` +
             `What to produce:\n${plan.brief}\n\n<their_words>\n${dump}\n</their_words>` +
             (existing ? `\n\n<existing_version>\n${existing}\n</existing_version>` : "") +
             aboutBlock(aboutMe),
           images,
         ),
-      },
-    ],
   });
-  if (response.stop_reason === "refusal" || !response.parsed_output) {
-    throw new Error(`Could not write ${plan.type} (stop_reason: ${response.stop_reason})`);
-  }
-  return response.parsed_output;
+  return parsed;
 }
 
 const Plan = z.object({
@@ -306,31 +356,22 @@ export async function writePlan(
   aboutMe = "",
 ): Promise<PlanOutput> {
   const localNow = new Intl.DateTimeFormat("en-GB", { timeZone, dateStyle: "full", timeStyle: "short" }).format(now);
-  const response = await client.beta.messages.parse({
-    model: MODEL,
-    max_tokens: 16000,
-    ...FALLBACK,
-    output_config: { effort: "medium", format: betaZodOutputFormat(Plan) },
+  const parsed = await ask({
+    schema: Plan,
+    effort: "medium",
+    maxTokens: 16000,
     system: PLAN_SYSTEM,
-    messages: [
-      {
-        role: "user",
-        content:
-          `Local time: ${localNow}.\n\n` +
+    failure: `Could not write plan`,
+    content: `Local time: ${localNow}.\n\n` +
           `Open items:\n${JSON.stringify(items, null, 1)}\n\n` +
           `Done in the last 3 days: ${recentlyDone.length ? recentlyDone.join("; ") : "nothing yet"}\n\n` +
           `area_activity (days since anything was done in each area): ${JSON.stringify(areaActivity)}` +
           aboutBlock(aboutMe),
-      },
-    ],
   });
-  if (response.stop_reason === "refusal" || !response.parsed_output) {
-    throw new Error(`Could not write plan (stop_reason: ${response.stop_reason})`);
-  }
   const known = new Set(items.map((i) => i.id));
   const seen = new Set<string>();
   // Keep only entries that reference a real item once, or that add a new task.
-  const entries = response.parsed_output.entries.filter((e) => {
+  const entries = parsed.entries.filter((e) => {
     if (e.item_id) {
       if (!known.has(e.item_id) || seen.has(e.item_id)) return false;
       seen.add(e.item_id);
@@ -338,7 +379,7 @@ export async function writePlan(
     }
     return Boolean(e.new_task?.title);
   });
-  return { headline: response.parsed_output.headline, entries };
+  return { headline: parsed.headline, entries };
 }
 
 const NudgeText = z.object({ title: z.string(), body: z.string() });
@@ -363,21 +404,15 @@ export async function writeNudge(
   style: (typeof NUDGE_STYLES)[number],
   attempt: number,
 ): Promise<NudgeMessage> {
-  const response = await client.beta.messages.parse({
-    model: MODEL,
-    max_tokens: 2000,
-    ...FALLBACK,
-    output_config: { effort: "low", format: betaZodOutputFormat(NudgeText) },
+  const parsed = await ask({
+    schema: NudgeText,
+    effort: "low",
+    maxTokens: 2000,
     system: NUDGE_SYSTEM,
-    messages: [
-      {
-        role: "user",
-        content: `Style: ${style}\nThis is nudge number ${attempt} for this item.\nItem: ${JSON.stringify(item)}`,
-      },
-    ],
+    failure: "Could not write nudge",
+    content: `Style: ${style}\nThis is nudge number ${attempt} for this item.\nItem: ${JSON.stringify(item)}`,
   });
-  if (response.stop_reason === "refusal" || !response.parsed_output) throw new Error("Could not write nudge");
-  return response.parsed_output;
+  return parsed;
 }
 
 const Learning = z.object({
@@ -407,26 +442,19 @@ export async function writeLearning(
   aboutMe = "",
   studyTopics = "",
 ): Promise<LearningBite> {
-  const response = await client.beta.messages.parse({
-    model: MODEL,
-    max_tokens: 16000,
-    ...FALLBACK,
-    output_config: { effort: "medium", format: betaZodOutputFormat(Learning) },
+  const parsed = await ask({
+    schema: Learning,
+    effort: "medium",
+    maxTokens: 16000,
     system: LEARNING_SYSTEM,
-    messages: [
-      {
-        role: "user",
-        content:
-          `Track: ${track}\nDate: ${now.toDateString()}\n` +
+    failure: "Could not write learning bite",
+    content: `Track: ${track}\nDate: ${now.toDateString()}\n` +
           (studyTopics ? `Study topics: ${studyTopics}\n` : "") +
           `Recent topics (do not repeat): ${recentTitles.join("; ") || "none yet"}\n` +
           `Their interests: ${interests.join(", ") || "unknown yet"}` +
           aboutBlock(aboutMe),
-      },
-    ],
   });
-  if (response.stop_reason === "refusal" || !response.parsed_output) throw new Error("Could not write learning bite");
-  return response.parsed_output;
+  return parsed;
 }
 
 const Meal = z.object({
@@ -454,26 +482,19 @@ export async function writeMeal(
   aboutMe = "",
 ): Promise<MealIdea> {
   const localNow = new Intl.DateTimeFormat("en-GB", { timeZone, dateStyle: "full", timeStyle: "short" }).format(now);
-  const response = await client.beta.messages.parse({
-    model: MODEL,
-    max_tokens: 8000,
-    ...FALLBACK,
-    output_config: { effort: "low", format: betaZodOutputFormat(Meal) },
+  const parsed = await ask({
+    schema: Meal,
+    effort: "low",
+    maxTokens: 8000,
     system: MEAL_SYSTEM,
-    messages: [
-      {
-        role: "user",
-        content:
-          `Local time: ${localNow} (${weekend ? "weekend" : "workday"}).\n` +
+    failure: "Could not suggest a meal",
+    content: `Local time: ${localNow} (${weekend ? "weekend" : "workday"}).\n` +
           `Saved recipes: ${JSON.stringify(saved)}\n` +
           `Cooked or suggested recently (avoid): ${recentMeals.join("; ") || "nothing yet"}\n` +
           `What they said they have at home: ${kitchenNotes.join("; ") || "unknown"}` +
           aboutBlock(aboutMe),
-      },
-    ],
   });
-  if (response.stop_reason === "refusal" || !response.parsed_output) throw new Error("Could not suggest a meal");
-  const idea = response.parsed_output;
+  const idea = parsed;
   if (idea.saved_recipe_id && !saved.some((r) => r.id === idea.saved_recipe_id)) idea.saved_recipe_id = null;
   return idea;
 }

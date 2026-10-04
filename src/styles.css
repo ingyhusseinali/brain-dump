@@ -371,3 +371,11 @@ h2, .item-title, .daily-title { font-weight: 800; }
 .cook-step { flex: 1; margin: 0; font-size: clamp(1.4rem, 5.5vw, 2.2rem); font-weight: 800; line-height: 1.35; overflow-y: auto; }
 .cook-timer { align-self: center; border: 0; border-radius: 999px; padding: 14px 24px; font: inherit; font-weight: 900; font-size: 1.2rem; background: var(--surface); color: var(--accent); box-shadow: var(--shadow); }
 .cook-nav { display: flex; justify-content: space-between; gap: 12px; }
+
+/* Thoughts waiting for Claude's next round (free setup). */
+.inbox-card { display: flex; gap: 10px; align-items: center; margin: 0; padding: 12px 14px; border-radius: var(--radius); font-weight: 700;
+  background: linear-gradient(110deg, color-mix(in srgb, #ffb020 22%, var(--surface)), color-mix(in srgb, #ff5fa2 16%, var(--surface)));
+  box-shadow: var(--shadow); }
+.inbox-card > span { font-size: 1.4rem; animation: inbox-bob 2.4s ease-in-out infinite; }
+@keyframes inbox-bob { 50% { transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .inbox-card > span { animation: none; } }

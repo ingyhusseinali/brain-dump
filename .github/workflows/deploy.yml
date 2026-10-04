@@ -77,11 +77,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+        # The Supabase address, its public key and the notification public key are in
+        # .env.production (all public by design), written by scripts/setup-free.mjs.
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
-          VITE_SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          VITE_VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

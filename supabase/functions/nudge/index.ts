@@ -7,8 +7,9 @@ import { sendToUser } from "../_shared/push.ts";
 import { buildPlan } from "../_shared/plan.ts";
 import { processDump } from "../_shared/file.ts";
 import { suggestMeal } from "../_shared/meal.ts";
+import { createLearningBite } from "../_shared/learning.ts";
 import { prayerTimesFor } from "../_shared/prayer.ts";
-import { NUDGE_STYLES, writeLearning, writeNudge } from "../_shared/claude.ts";
+import { hasAI, NUDGE_STYLES, writeNudge } from "../_shared/claude.ts";
 import {
   dailyDue,
   fertileWindow,
@@ -52,6 +53,8 @@ interface FullProfile extends Profile {
   cooking_daily: boolean;
   cooking_minute: number;
   last_meal_on: string | null;
+  meal_today_id: string | null;
+  meal_pushed_on: string | null;
   last_fertile_nudge_for: string | null;
 }
 
@@ -105,7 +108,8 @@ async function runForUser(profile: FullProfile, items: Item[], now: Date) {
     .lt("created_at", new Date(now.getTime() - 2 * 60_000).toISOString())
     .order("created_at")
     .limit(3);
-  for (const dump of waiting ?? []) await processDump(db, userId, dump, profile.timezone).catch(() => {});
+  // (In the free setup Claude files them on its own rounds instead.)
+  for (const dump of hasAI() ? waiting ?? [] : []) await processDump(db, userId, dump, profile.timezone).catch(() => {});
 
   // Nothing to maintain: tasks ignored for weeks quietly step aside (they stay searchable).
   const stale = staleToRetire(items, now);
@@ -188,15 +192,41 @@ async function runForUser(profile: FullProfile, items: Item[], now: Date) {
 
   // Daily learning bite, alternating faith and general knowledge.
   if (profile.learning_daily && !holdForPrayer && dailyDue(profile.learning_minute, profile.last_learning_on, profile, now)) {
-    await db.from("profiles").update({ last_learning_on: today }).eq("user_id", userId);
-    await sendLearningBite(userId, items, now, profile.about_me, profile.study_topics);
+    if (hasAI()) {
+      await db.from("profiles").update({ last_learning_on: today }).eq("user_id", userId);
+      await sendLearningBite(userId, items, now, profile.about_me, profile.study_topics);
+    } else {
+      // Free setup: Claude writes the bite on its morning round; announce it once it's there.
+      const { data: bite } = await db
+        .from("outputs")
+        .select("id, title")
+        .eq("user_id", userId)
+        .eq("type", "learning")
+        .gte("created_at", new Date(now.getTime() - 20 * 3_600_000).toISOString())
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (bite) {
+        await db.from("profiles").update({ last_learning_on: today }).eq("user_id", userId);
+        await sendToUser(db, userId, { title: "🧠 5 minutes for your brain", body: bite.title, url: `?output=${bite.id}`, tag: "learning" });
+      }
+    }
   }
 
-  // What to cook today, early enough to shop or defrost. Skipped if they already asked in the app.
-  if (profile.cooking_daily && !holdForPrayer && dailyDue(profile.cooking_minute, profile.last_meal_on, profile, now)) {
-    await db.from("profiles").update({ last_meal_on: today }).eq("user_id", userId);
-    const meal = await suggestMeal(db, userId, profile.timezone, now, isWeekend(profile.weekend_days, now, profile.timezone));
-    await sendToUser(db, userId, { title: `🍳 Tonight: ${meal.title}`, body: meal.teaser, url: `?output=${meal.outputId}`, tag: "meal" });
+  // What to cook today, early enough to shop or defrost. If they already picked one in the app
+  // (or Claude did on its morning round), this is the reminder for it.
+  if (profile.cooking_daily && !holdForPrayer && dailyDue(profile.cooking_minute, profile.meal_pushed_on, profile, now)) {
+    let meal: { outputId: string; title: string; teaser: string } | null = null;
+    if (profile.last_meal_on === today && profile.meal_today_id) {
+      const { data } = await db.from("outputs").select("id, title").eq("id", profile.meal_today_id).maybeSingle();
+      if (data) meal = { outputId: data.id, title: data.title, teaser: "Tap for the recipe and ingredients." };
+    } else if (hasAI()) {
+      meal = await suggestMeal(db, userId, profile.timezone, now, isWeekend(profile.weekend_days, now, profile.timezone));
+    }
+    if (meal) {
+      await db.from("profiles").update({ meal_pushed_on: today }).eq("user_id", userId);
+      await sendToUser(db, userId, { title: `🍳 Tonight: ${meal.title}`, body: meal.teaser, url: `?output=${meal.outputId}`, tag: "meal" });
+    }
   }
 
   // Evening Quran nudge if today's page isn't read yet: after Isha when prayer times are on, else 20:30.
@@ -235,38 +265,11 @@ async function runForUser(profile: FullProfile, items: Item[], now: Date) {
 }
 
 async function sendLearningBite(userId: string, items: Item[], now: Date, aboutMe: string, studyTopics: string) {
-  // Rotate faith and general knowledge, plus certification study when they have topics set.
-  const dayNumber = Math.floor(now.getTime() / 86_400_000);
-  const tracks = studyTopics.trim() ? (["faith", "study", "general"] as const) : (["faith", "general"] as const);
-  const track = tracks[dayNumber % tracks.length];
-
-  const { data: recent } = await db
-    .from("outputs")
-    .select("title")
-    .eq("user_id", userId)
-    .eq("type", "learning")
-    .order("created_at", { ascending: false })
-    .limit(30);
-  const interests = [...new Set(items.filter((i) => i.kind === "goal" || i.kind === "idea").map((i) => i.title))].slice(0, 10);
-  const bite = await writeLearning(track, (recent ?? []).map((r) => r.title), interests, now, aboutMe, studyTopics);
-
-  let { data: folder } = await db.from("folders").select("id").eq("user_id", userId).ilike("name", "Daily learning").maybeSingle();
-  if (!folder) {
-    ({ data: folder } = await db
-      .from("folders")
-      .insert({ user_id: userId, name: "Daily learning", kind: "general", area: "education" })
-      .select("id")
-      .single());
-  }
-  const { data: output } = await db
-    .from("outputs")
-    .insert({ user_id: userId, folder_id: folder?.id ?? null, type: "learning", title: bite.title, content: bite.content })
-    .select("id")
-    .single();
+  const bite = await createLearningBite(db, userId, items, now, aboutMe, studyTopics);
   await sendToUser(db, userId, {
-    title: track === "faith" ? "🌙 5 minutes for your soul" : track === "study" ? "🎓 5 minutes closer to certified" : "🧠 5 minutes for your brain",
+    title: bite.track === "faith" ? "🌙 5 minutes for your soul" : bite.track === "study" ? "🎓 5 minutes closer to certified" : "🧠 5 minutes for your brain",
     body: bite.teaser,
-    url: output ? `?output=${output.id}` : "?view=today",
+    url: bite.id ? `?output=${bite.id}` : "?view=today",
     tag: "learning",
   });
 }

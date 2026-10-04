@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Capture } from "./Capture";
+import { Capture, FREE_MODE } from "./Capture";
 import { OutputCard } from "./OutputCard";
 import { Daily } from "./Daily";
 import { Focus } from "./Focus";
@@ -23,6 +23,7 @@ export function Today({ brain, today, library, profileState, highlightId, onOpen
   const [focusing, setFocusing] = useState(false);
   const { items, actions } = brain;
   const { plan, writing, failed, rewrite } = today;
+  const waiting = brain.unsorted.filter((d) => !d.error).length;
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
 
   // Plan entries in order, skipping anything deleted or let go since it was written.
@@ -82,6 +83,14 @@ export function Today({ brain, today, library, profileState, highlightId, onOpen
         </section>
       )}
       <Capture />
+
+      {waiting > 0 && (
+        <p className="inbox-card" role="status">
+          <span aria-hidden>📥</span>
+          {waiting === 1 ? "1 thought" : `${waiting} thoughts`} waiting.{" "}
+          {FREE_MODE ? "Claude sorts them every hour, and they'll pop into place." : "Sorting now…"}
+        </p>
+      )}
 
       {ready.length > 0 && (
         <section aria-labelledby="ready-title">

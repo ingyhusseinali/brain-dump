@@ -3,6 +3,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.117.2";
 import { suggestMeal } from "../_shared/meal.ts";
 import { isWeekend } from "../_shared/schedule.ts";
+import { NoAIError } from "../_shared/claude.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -32,6 +33,8 @@ Deno.serve(async (req) => {
     return json({ meal });
   } catch (err) {
     console.error(err);
-    return json({ error: "Could not think of a meal right now" }, 502);
+    return err instanceof NoAIError
+      ? json({ error: "Claude picks a new meal on its next round. Save more recipes for more choice." }, 503)
+      : json({ error: "Could not think of a meal right now" }, 502);
   }
 });

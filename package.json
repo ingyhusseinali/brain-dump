@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "check:functions": "deno check supabase/functions/*/index.ts",
+    "check:functions": "cd supabase/functions && deno check */index.ts _here/*.ts",
     "build:demo": "node scripts/build-demo-page.mjs"
   },
   "dependencies": {

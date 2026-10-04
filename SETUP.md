@@ -1,5 +1,22 @@
 # Setting up Brain Dump
 
+## Free setup (no Claude API key)
+
+Claude in your Claude project does the thinking instead of the paid API. It checks for new dumps every hour, files them, and writes your daily list, learning bite and what to cook. Reminders and prayer times still come straight from the app.
+
+1. **Supabase token.** In [supabase.com](https://supabase.com), open your account menu, then **Access Tokens**, and generate a token.
+2. **Give it to Claude.** In the Claude project's settings, add a cloud environment:
+   - Under **Network access**, choose **Custom**. Allow `api.supabase.com` and `*.supabase.co`, and keep the package managers.
+   - Add the environment variable `SUPABASE_ACCESS_TOKEN` with the token.
+3. **GitHub Pages.** In the repo, open **Settings → Pages** and set **Source** to **GitHub Actions**.
+4. Claude runs `supabase/functions/_here/setup.ts`, which sets up the database, functions, notification keys and login links. It then commits `.env.production`, and the app goes live at `https://<you>.github.io/brain-dump/`.
+
+Every hour after that, Claude runs `supabase/functions/_here/run.ts`. It writes each request to a file, and Claude answers in the matching answer file.
+
+Moving to the paid setup later: add `ANTHROPIC_API_KEY` to the Supabase project's secrets. Filing then happens instantly, and the hourly round finds nothing left to do.
+
+## Paid setup (Claude API key)
+
 About 20 minutes, once. After that, every push to `main` tests and deploys automatically.
 
 ## 1. Supabase (database, login, sync)

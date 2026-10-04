@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ItemRow } from "./ItemRow";
 import type { useBrain } from "../lib/items";
 import { sortDump } from "../lib/dumps";
+import { FREE_MODE } from "./Capture";
 import { AREA_ICON, AREA_LABEL, KIND_LABEL } from "../lib/labels";
 import { AREAS, type Area, type ItemKind } from "../../supabase/functions/_shared/schedule";
 
@@ -64,7 +65,7 @@ export function Everything({ brain }: { brain: ReturnType<typeof useBrain> }) {
 
       {unsorted.length > 0 && (
         <section>
-          <h2 className="section-title">Still sorting</h2>
+          <h2 className="section-title">{FREE_MODE ? "Waiting for Claude's next round" : "Still sorting"}</h2>
           <ul className="list">
             {unsorted.map((d) => (
               <li key={d.id} className="item dump">

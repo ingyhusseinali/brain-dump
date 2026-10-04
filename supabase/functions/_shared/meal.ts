@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.117.2";
-import { writeMeal } from "./claude.ts";
+import { hasAI, type MealIdea, NoAIError, writeMeal } from "./claude.ts";
 import { localDate } from "./schedule.ts";
 
 const RECIPES_FOLDER = "Recipes";
@@ -36,16 +36,21 @@ export async function suggestMeal(
   ]);
 
   const all = recipes ?? [];
-  const recent = all.filter((r) => (r.last_cooked_on && r.last_cooked_on >= weekAgo) || r.created_at >= new Date(now.getTime() - 7 * 86_400_000).toISOString());
-  const idea = await writeMeal(
-    all.filter((r) => !r.last_cooked_on || r.last_cooked_on < weekAgo).map((r) => ({ id: r.id, title: r.title, tried: !!r.last_cooked_on })),
-    recent.map((r) => r.title),
-    (kitchen ?? []).map((k) => k.title),
-    now,
-    timeZone,
-    weekend,
-    profile?.about_me ?? "",
+  const recent = all.filter((r) =>
+    (r.last_cooked_on && r.last_cooked_on >= weekAgo) || r.created_at >= new Date(now.getTime() - 7 * 86_400_000).toISOString()
   );
+  const options = all.filter((r) => !r.last_cooked_on || r.last_cooked_on < weekAgo);
+  const idea = hasAI()
+    ? await writeMeal(
+      options.map((r) => ({ id: r.id, title: r.title, tried: !!r.last_cooked_on })),
+      recent.map((r) => r.title),
+      (kitchen ?? []).map((k) => k.title),
+      now,
+      timeZone,
+      weekend,
+      profile?.about_me ?? "",
+    )
+    : pickSaved(options.filter((r) => r.id !== profile?.meal_today_id));
 
   let outputId = idea.saved_recipe_id;
   if (!outputId) {
@@ -65,4 +70,13 @@ export async function suggestMeal(
   }
   await db.from("profiles").update({ last_meal_on: today, meal_today_id: outputId }).eq("user_id", userId);
   return { outputId, title: idea.title, teaser: idea.teaser, why: idea.why };
+}
+
+/** Free setup, when they tap "Something else" between Claude's rounds: one of their saved recipes, untried ones first. */
+function pickSaved(options: { id: string; title: string; last_cooked_on: string | null }[]): MealIdea {
+  const untried = options.filter((r) => !r.last_cooked_on);
+  const pool = untried.length ? untried : options;
+  if (!pool.length) throw new NoAIError();
+  const r = pool[Math.floor(Math.random() * pool.length)];
+  return { saved_recipe_id: r.id, title: r.title, teaser: "From your saved recipes.", why: "One you saved to try.", content: null };
 }

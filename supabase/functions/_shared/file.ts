@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.117.2";
-import { sortDump, writeOutput, type DumpImage, type OutputPlan, type SortResult } from "./claude.ts";
+import { NoAIError, sortDump, writeOutput, type DumpImage, type OutputPlan, type SortResult } from "./claude.ts";
 import { sendToUser } from "./push.ts";
 import { localDate } from "./schedule.ts";
 import { encodeBase64 } from "jsr:@std/encoding@1/base64";
@@ -61,6 +61,11 @@ export async function processDump(
     await db.from("dumps").update({ processed_at: new Date().toISOString(), error: null }).eq("id", dump.id);
     return result;
   } catch (err) {
+    if (err instanceof NoAIError) {
+      // Free setup: leave it waiting for Claude's next round, not marked as failed.
+      await db.from("dumps").update({ processing_started_at: null }).eq("id", dump.id);
+      return null;
+    }
     console.error("filing failed", dump.id, err);
     // The raw dump is already saved; record the failure so the app can offer a retry.
     await db

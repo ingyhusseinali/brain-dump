@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.117.2";
-import { writePlan } from "./claude.ts";
-import { AREAS, localDate, planCandidates, type Item } from "./schedule.ts";
+import { hasAI, writePlan } from "./claude.ts";
+import { AREAS, localDate, pickNow, planCandidates, type Item } from "./schedule.ts";
 
 export interface PlanRow {
   plan_date: string;
@@ -49,6 +49,14 @@ export async function buildPlan(
       .order("completed_at", { ascending: false }),
   ]);
   if (error) throw error;
+
+  if (!hasAI()) {
+    // Free setup: show the most pressing items now. Claude's own list replaces this
+    // on its next round, so it isn't saved.
+    const top = pickNow((open ?? []) as Item[], now, 5);
+    const plan: PlanRow = { plan_date: planDate, headline: "Here's what's up next", entries: top.map((i) => ({ item_id: i.id, why: "" })), generated_at: now.toISOString() };
+    return { plan, created: false };
+  }
 
   const candidates = planCandidates((open ?? []) as Item[], now);
   const lastDone = new Map<string, number>();
