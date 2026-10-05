@@ -42,7 +42,14 @@ export function ItemRow({ item, why, highlight, onDone, onReopen, onSnooze, onAr
           {done ? "✓" : ""}
         </button>
         <button className="item-body" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-          <span className="item-title">{item.title}</span>
+          <span className="item-title">
+            {item.priority === 1 && !done && (
+              <span className="prio" title="High priority">
+                High
+              </span>
+            )}
+            {item.title}
+          </span>
           <span className="item-meta">
             <span className="dot" aria-hidden />
             {meta.join(" · ")}

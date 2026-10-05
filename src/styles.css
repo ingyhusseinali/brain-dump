@@ -518,3 +518,4 @@ h2 { font-size: 1.1rem; font-weight: 800; }
 .tabs button.is-on span { filter: none; opacity: 1; transform: none; }
 .tabs button.is-on::after { display: none; }
 .tab-today, .tab-lists, .tab-calendar, .tab-more { --c: var(--accent); }
+.prio { display: inline-block; vertical-align: 2px; margin-right: 6px; padding: 1px 7px; border-radius: 999px; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--warn); background: color-mix(in srgb, var(--warn) 13%, transparent); }
