@@ -11,18 +11,26 @@ import { Folders } from "./components/Folders";
 import { OutputView } from "./components/OutputView";
 import { Login } from "./components/Login";
 import { Today } from "./components/Today";
-import { Everything } from "./components/Everything";
+import { Lists } from "./components/Lists";
+import { ListView } from "./components/ListView";
+import { More } from "./components/More";
+import { AddSheet } from "./components/AddSheet";
+import type { ListSpec } from "./lib/lists";
 import { Settings } from "./components/Settings";
 import { Calendar } from "./components/Calendar";
 import { Money } from "./components/Money";
 import { useMoney } from "./lib/money";
 
-type View = "today" | "calendar" | "folders" | "money" | "all" | "settings";
+type View = "today" | "lists" | "calendar" | "more" | "folders" | "money" | "settings";
 
 function initialView(): View {
   const v = new URLSearchParams(location.search).get("view");
-  return v === "calendar" || v === "folders" || v === "money" || v === "all" || v === "settings" ? v : "today";
+  if (v === "all") return "lists";
+  return v === "calendar" || v === "folders" || v === "money" || v === "settings" || v === "lists" || v === "more" ? v : "today";
 }
+
+// Which bottom tab a screen belongs to.
+const TAB_OF: Record<View, View> = { today: "today", lists: "lists", calendar: "calendar", more: "more", folders: "more", money: "more", settings: "more" };
 
 export function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -48,7 +56,20 @@ export function App() {
 }
 
 function SignedIn({ userId, email }: { userId: string; email: string }) {
-  const [view, setView] = useState<View>(initialView);
+  const [view, setViewRaw] = useState<View>(initialView);
+  const [list, setList] = useState<{ spec: ListSpec; from: View } | null>(null);
+  const [folderId, setFolderId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const setView = (v: View) => {
+    setList(null);
+    setFolderId(null);
+    setViewRaw(v);
+    window.scrollTo(0, 0);
+  };
+  const openList = (spec: ListSpec) => {
+    setList({ spec, from: view });
+    window.scrollTo(0, 0);
+  };
   const [highlightId] = useState(() => new URLSearchParams(location.search).get("item"));
   const brain = useBrain(userId);
   const today = usePlan(userId);
@@ -94,7 +115,8 @@ function SignedIn({ userId, email }: { userId: string; email: string }) {
   return (
     <>
       <main>
-        {view === "today" && (
+        {list && <ListView spec={list.spec} brain={brain} onBack={() => setList(null)} />}
+        {!list && view === "today" && (
           <Today
             brain={brain}
             today={today}
@@ -102,32 +124,64 @@ function SignedIn({ userId, email }: { userId: string; email: string }) {
             profileState={profileState}
             highlightId={highlightId}
             onOpenOutput={setOutputId}
+            onOpenList={openList}
+            onOpenSettings={() => setView("settings")}
+            onAdd={() => setAdding(true)}
           />
         )}
-        {view === "calendar" && (
+        {!list && view === "lists" && (
+          <Lists
+            brain={brain}
+            library={library}
+            onOpenList={openList}
+            onOpenFolder={(id) => {
+              setFolderId(id);
+              setViewRaw("folders");
+            }}
+          />
+        )}
+        {!list && view === "more" && <More onGo={setView} />}
+        {!list && view === "calendar" && (
           <Calendar
             brain={brain}
             profileState={profileState}
             plan={today.plan}
           />
         )}
-        {view === "money" && <Money money={money} profileState={profileState} brain={brain} />}
-        {view === "folders" && <Folders brain={brain} library={library} onOpenOutput={setOutputId} />}
-        {view === "all" && <Everything brain={brain} />}
-        {view === "settings" && <Settings state={profileState} email={email} />}
+        {!list && view === "money" && <Money money={money} profileState={profileState} brain={brain} />}
+        {!list && view === "folders" && (
+          <Folders
+            key={folderId ?? "all"}
+            brain={brain}
+            library={library}
+            onOpenOutput={setOutputId}
+            startId={folderId}
+            onBack={() => setView(folderId ? "lists" : "more")}
+          />
+        )}
+        {!list && view === "settings" && <Settings state={profileState} email={email} />}
       </main>
+      {(view === "today" || view === "lists" || view === "calendar") && !adding && (
+        <button className="fab" onClick={() => setAdding(true)} aria-label="Add a thought">
+          +
+        </button>
+      )}
+      {adding && <AddSheet onClose={() => setAdding(false)} />}
       <nav className="tabs" aria-label="Sections">
         {(
           [
-            ["today", "☀️", "Today"],
+            ["today", "🏠", "Home"],
+            ["lists", "☰", "My Lists"],
             ["calendar", "📅", "Calendar"],
-            ["folders", "📁", "Folders"],
-            ["money", "💰", "Money"],
-            ["all", "🗂", "All"],
-            ["settings", "⚙️", "Settings"],
+            ["more", "•••", "More"],
           ] as const
         ).map(([v, icon, label]) => (
-          <button key={v} className={`tab-${v} ${view === v ? "is-on" : ""}`} onClick={() => setView(v)} aria-current={view === v ? "page" : undefined}>
+          <button
+            key={v}
+            className={`tab-${v} ${TAB_OF[view] === v && !list ? "is-on" : ""} ${list && TAB_OF[list.from] === v ? "is-on" : ""}`}
+            onClick={() => setView(v)}
+            aria-current={TAB_OF[view] === v ? "page" : undefined}
+          >
             <span aria-hidden>{icon}</span>
             {label}
           </button>

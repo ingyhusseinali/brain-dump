@@ -9,6 +9,9 @@ interface Props {
   brain: ReturnType<typeof useBrain>;
   library: ReturnType<typeof useLibrary>;
   onOpenOutput: (id: string) => void;
+  /** Open straight into one folder; Back then calls onBack. */
+  startId?: string | null;
+  onBack?: () => void;
 }
 
 const GROUPS: [Folder["kind"], string][] = [
@@ -18,8 +21,8 @@ const GROUPS: [Folder["kind"], string][] = [
 ];
 
 /** Everything Claude has filed, by class and project. Nothing here needs organising by hand. */
-export function Folders({ brain, library, onOpenOutput }: Props) {
-  const [openId, setOpenId] = useState<string | null>(null);
+export function Folders({ brain, library, onOpenOutput, startId = null, onBack }: Props) {
+  const [openId, setOpenId] = useState<string | null>(startId);
   const folder = library.folders.find((f) => f.id === openId);
 
   if (folder) {
@@ -27,8 +30,8 @@ export function Folders({ brain, library, onOpenOutput }: Props) {
     const items = brain.items.filter((i) => i.folder_id === folder.id && i.status !== "archived");
     return (
       <div className="page">
-        <button className="link" onClick={() => setOpenId(null)}>
-          ‹ All folders
+        <button className="link" onClick={() => (onBack ? onBack() : setOpenId(null))}>
+          ‹ {onBack ? "Back" : "All folders"}
         </button>
         <header className={`folder-hero area-${folder.area}`}>
           <span className="folder-hero-icon" aria-hidden>
@@ -70,6 +73,11 @@ export function Folders({ brain, library, onOpenOutput }: Props) {
 
   return (
     <div className="page">
+      {onBack && (
+        <button className="link" onClick={onBack}>
+          ‹ Back
+        </button>
+      )}
       <h1>Folders</h1>
       <p className="muted">Claude files your thoughts here by class and project. Talk about a class or project and it appears.</p>
       {GROUPS.map(([kind, label]) => {

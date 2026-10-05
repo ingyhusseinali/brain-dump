@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Item, SnoozePreset } from "../../supabase/functions/_shared/schedule";
-import { AREA_ICON, AREA_LABEL, KIND_LABEL, formatWhen } from "../lib/labels";
+import { AREA_LABEL, KIND_LABEL, formatWhen } from "../lib/labels";
 
 interface Props {
   item: Item;
@@ -19,44 +19,42 @@ const SNOOZES: [SnoozePreset, string][] = [
   ["next_week", "Next week"],
 ];
 
+/** One clean row: a circle to tick (and untick), the title, and a small coloured line saying where it belongs. */
 export function ItemRow({ item, why, highlight, onDone, onReopen, onSnooze, onArchive }: Props) {
   const [open, setOpen] = useState(false);
   const done = item.status === "done";
-  const checkable = item.kind === "task" || item.kind === "reminder" || item.kind === "goal";
+  const meta = [
+    AREA_LABEL[item.area],
+    item.kind !== "task" ? KIND_LABEL[item.kind] : null,
+    item.remind_at && !done ? formatWhen(item.remind_at) : null,
+    item.status === "snoozed" && item.snoozed_until ? `Snoozed till ${formatWhen(item.snoozed_until)}` : null,
+  ].filter(Boolean);
 
   return (
     <li className={`item area-${item.area} ${done ? "is-done" : ""} ${highlight ? "is-highlight" : ""}`}>
       <div className="item-main">
-        {checkable ? (
-          <button
-            className="check"
-            aria-label={done ? `Mark "${item.title}" not done` : `Mark "${item.title}" done`}
-            onClick={done ? onReopen : onDone}
-          >
-            {done ? "✓" : ""}
-          </button>
-        ) : (
-          <span className="kind-dot" aria-hidden>
-            {item.kind === "idea" ? "💡" : "📝"}
-          </span>
-        )}
+        <button
+          className="check"
+          aria-pressed={done}
+          aria-label={done ? `Untick "${item.title}"` : `Tick "${item.title}"`}
+          onClick={done ? onReopen : onDone}
+        >
+          {done ? "✓" : ""}
+        </button>
         <button className="item-body" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
           <span className="item-title">{item.title}</span>
           <span className="item-meta">
-            <span className="chip area-chip">
-              {AREA_ICON[item.area]} {AREA_LABEL[item.area]}
-            </span>
-            {item.kind !== "task" && <span className="chip subtle">{KIND_LABEL[item.kind]}</span>}
-            {item.remind_at && !done && <span className="chip when">{formatWhen(item.remind_at)}</span>}
-            {item.status === "snoozed" && item.snoozed_until && (
-              <span className="chip subtle">Snoozed till {formatWhen(item.snoozed_until)}</span>
-            )}
+            <span className="dot" aria-hidden />
+            {meta.join(" · ")}
           </span>
-          {why && <span className="item-why">{why}</span>}
         </button>
+        <span className={`item-chev ${open ? "is-open" : ""}`} aria-hidden>
+          ›
+        </span>
       </div>
       {open && (
         <div className="item-more">
+          {why && <p className="item-why">{why}</p>}
           {item.details && <p className="item-details">{item.details}</p>}
           {!done && (
             <div className="row-actions">

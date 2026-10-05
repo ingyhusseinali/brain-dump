@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Capture, FREE_MODE } from "./Capture";
+import { FREE_MODE } from "./Capture";
 import { OutputCard } from "./OutputCard";
 import { Daily } from "./Daily";
 import { Focus } from "./Focus";
@@ -8,7 +8,17 @@ import type { useLibrary } from "../lib/library";
 import { ItemRow } from "./ItemRow";
 import type { useBrain } from "../lib/items";
 import type { usePlan } from "../lib/plan";
-import { pickNow, type Item } from "../../supabase/functions/_shared/schedule";
+import { AREAS, pickNow, type Area, type Item } from "../../supabase/functions/_shared/schedule";
+import { AREA_ICON, AREA_LABEL } from "../lib/labels";
+import { countOpen, type ListSpec } from "../lib/lists";
+
+function greeting(): string {
+  const h = new Date().getHours();
+  return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+}
+
+// Shown as tiles when nothing is filed yet.
+const STARTER: Area[] = ["career", "education", "personal", "health", "money", "home_family"];
 
 interface Props {
   brain: ReturnType<typeof useBrain>;
@@ -17,10 +27,14 @@ interface Props {
   profileState: ReturnType<typeof useProfile>;
   highlightId: string | null;
   onOpenOutput: (id: string) => void;
+  onOpenList: (spec: ListSpec) => void;
+  onOpenSettings: () => void;
+  onAdd: () => void;
 }
 
-export function Today({ brain, today, library, profileState, highlightId, onOpenOutput }: Props) {
+export function Today({ brain, today, library, profileState, highlightId, onOpenOutput, onOpenList, onOpenSettings, onAdd }: Props) {
   const [focusing, setFocusing] = useState(false);
+  const [query, setQuery] = useState("");
   const { items, actions } = brain;
   const { plan, writing, failed, rewrite } = today;
   const waiting = brain.unsorted.filter((d) => !d.error).length;
@@ -53,6 +67,11 @@ export function Today({ brain, today, library, profileState, highlightId, onOpen
   const folderName = (id: string | null) => library.folders.find((f) => f.id === id)?.name ?? null;
 
   const fallback = !plan ? pickNow(items, new Date()) : [];
+
+  // Category tiles: the busiest life areas, or a starter set before anything is filed.
+  const counts = AREAS.map((a) => ({ a, n: countOpen({ area: a }, items) }));
+  const used = counts.filter((c) => c.n > 0).sort((x, y) => y.n - x.n);
+  const tiles = used.length ? used.slice(0, 6) : STARTER.map((a) => ({ a, n: 0 }));
   const row = (item: Item, why?: string) => (
     <ItemRow
       key={item.id}
@@ -72,17 +91,65 @@ export function Today({ brain, today, library, profileState, highlightId, onOpen
   }
 
   return (
-    <div className="page">
+    <div className="page home">
+      <header className="home-head">
+        <div>
+          <h1>
+            {greeting()}, Ingy <span aria-hidden>☀️</span>
+          </h1>
+          <p className="muted">What's on your mind today?</p>
+        </div>
+        <button className="icon-btn" onClick={onOpenSettings} aria-label="Settings">
+          ⚙️
+        </button>
+      </header>
+
+      <form
+        className="search-wrap"
+        role="search"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (query.trim()) onOpenList({ query: query.trim() });
+        }}
+      >
+        <span aria-hidden>🔍</span>
+        <input type="search" placeholder="Search your brain dump…" value={query} onChange={(e) => setQuery(e.target.value)} />
+      </form>
+
       {!items.length && !brain.unsorted.length && !plan && !writing && (
-        <section className="welcome">
-          <h1>Hi Ingy 👋</h1>
-          <p>
-            Start by telling me about your life, in English or Arabic, as messy as you like: your work, studies and deadlines, home,
-            family and friends, and anything on your mind. I'll set up your folders and plans from it.
-          </p>
-        </section>
+        <button className="welcome" onClick={onAdd}>
+          <strong>Start here 👋</strong>
+          <span>
+            Tap + and tell me about your life, in English or Arabic, as messy as you like: work, studies, deadlines, home, family and
+            friends. I'll sort it all into place.
+          </span>
+        </button>
       )}
-      <Capture />
+
+      <ul className="tiles">
+        {tiles.map(({ a, n }) => (
+          <li key={a} className={`area-${a}`}>
+            <button className="tile" onClick={() => onOpenList({ area: a })}>
+              <span className="tile-icon" aria-hidden>
+                {AREA_ICON[a]}
+              </span>
+              <span className="tile-label">{AREA_LABEL[a]}</span>
+              <span className="tile-count">{n}</span>
+            </button>
+          </li>
+        ))}
+        {tiles.length % 2 === 1 && (
+          <li className="area-all">
+            <button className="tile" onClick={() => onOpenList({ smart: "all" })}>
+              <span className="tile-icon" aria-hidden>
+                🗂
+              </span>
+              <span className="tile-label">All items</span>
+              <span className="tile-count">{countOpen({ smart: "all" }, items)}</span>
+            </button>
+          </li>
+        )}
+      </ul>
 
       {waiting > 0 && (
         <p className="inbox-card" role="status">
@@ -91,6 +158,55 @@ export function Today({ brain, today, library, profileState, highlightId, onOpen
           {FREE_MODE ? "Claude sorts them every hour, and they'll pop into place." : "Sorting now…"}
         </p>
       )}
+
+      <section className="today" aria-labelledby="today-title">
+        <header className="today-head">
+          <div>
+            <h2 id="today-title">Today</h2>
+            <p className="muted small">
+              {new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}
+              {plan?.headline ? ` · ${plan.headline}` : ""}
+            </p>
+          </div>
+          {planned.length > 0 && (
+            <span className="progress" aria-label={`${doneCount} of ${planned.length} done`}>
+              {doneCount}/{planned.length}
+            </span>
+          )}
+        </header>
+
+        {writing && <p className="muted">Writing today's list from everything you've told me…</p>}
+        {failed && !writing && <p className="muted">I couldn't write today's list just now. Here's what looks most pressing.</p>}
+
+        {planned.length > 0 && !allDone && (
+          <button className="link focus-btn" onClick={() => setFocusing(true)}>
+            🎯 Just show me one thing
+          </button>
+        )}
+        {planned.length > 0 && <ol className="list rows">{planned.map((e) => row(e.item, e.why))}</ol>}
+        {allDone && <p className="celebrate">All done for today. That's genuinely great. 🎉</p>}
+
+        {!plan && !writing && fallback.length > 0 && <ol className="list rows">{fallback.map((i) => row(i))}</ol>}
+        {!plan && !writing && !fallback.length && (
+          <p className="muted">Nothing here yet. Just talk: whatever is on your mind goes in the box above, and I'll sort, file and prepare things for you.</p>
+        )}
+
+        {fresh.length > 0 && (
+          <>
+            <h2 className="section-title">New since this list was written</h2>
+            <ol className="list rows">{fresh.map((i) => row(i))}</ol>
+          </>
+        )}
+
+        {plan && (
+          <p className="muted small">
+            Tick things off as you go (tap again to untick). Anything left over is rethought tomorrow.{" "}
+            <button className="link inline" onClick={() => void rewrite()} disabled={writing}>
+              Rewrite now
+            </button>
+          </p>
+        )}
+      </section>
 
       {ready.length > 0 && (
         <section aria-labelledby="ready-title">
@@ -104,52 +220,6 @@ export function Today({ brain, today, library, profileState, highlightId, onOpen
           </ul>
         </section>
       )}
-
-      <section className="today" aria-labelledby="today-title">
-        <header className="today-head today-hero">
-          <div>
-            <p className="eyebrow">{new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" })}</p>
-            <h1 id="today-title">{plan?.headline ?? "Today"}</h1>
-          </div>
-          {planned.length > 0 && (
-            <span className="progress" aria-label={`${doneCount} of ${planned.length} done`}>
-              {doneCount}/{planned.length}
-            </span>
-          )}
-        </header>
-
-        {writing && <p className="muted">Writing today's list from everything you've told me…</p>}
-        {failed && !writing && <p className="muted">I couldn't write today's list just now. Here's what looks most pressing.</p>}
-
-        {planned.length > 0 && !allDone && (
-          <button className="pill focus-btn" onClick={() => setFocusing(true)}>
-            🎯 Just show me one thing
-          </button>
-        )}
-        {planned.length > 0 && <ol className="list">{planned.map((e) => row(e.item, e.why))}</ol>}
-        {allDone && <p className="celebrate">All done for today. That's genuinely great. 🎉</p>}
-
-        {!plan && !writing && fallback.length > 0 && <ol className="list">{fallback.map((i) => row(i))}</ol>}
-        {!plan && !writing && !fallback.length && (
-          <p className="muted">Nothing here yet. Just talk: whatever is on your mind goes in the box above, and I'll sort, file and prepare things for you.</p>
-        )}
-
-        {fresh.length > 0 && (
-          <>
-            <h2 className="section-title">New since this list was written</h2>
-            <ol className="list">{fresh.map((i) => row(i))}</ol>
-          </>
-        )}
-
-        {plan && (
-          <p className="muted small">
-            No need to tick things off: tell me when you've done something and I'll clear it. Anything left over is rethought tomorrow.{" "}
-            <button className="link inline" onClick={() => void rewrite()} disabled={writing}>
-              Rewrite now
-            </button>
-          </p>
-        )}
-      </section>
 
       <Daily state={profileState} outputs={library.outputs} onOpenOutput={onOpenOutput} />
     </div>

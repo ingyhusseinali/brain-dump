@@ -19,7 +19,8 @@ function savedLang(): string {
 /** Free setup: no Claude API key, so Claude files dumps on hourly rounds instead of instantly. */
 export const FREE_MODE = import.meta.env.VITE_FREE_MODE === "1";
 
-export function Capture() {
+/** hint: what the person said this is ("Task", "Worry"…), passed to Claude with the text. */
+export function Capture({ hint, onSaved, autoFocus }: { hint?: string; onSaved?: () => void; autoFocus?: boolean } = {}) {
   const [text, setText] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [usedVoice, setUsedVoice] = useState(false);
@@ -72,10 +73,11 @@ export function Capture() {
     setText("");
     setImages([]);
     setUsedVoice(false);
-    const result = await saveDump(body, usedVoice ? "voice" : "text", photos);
+    const result = await saveDump(hint && body ? `${hint}: ${body}` : body, usedVoice ? "voice" : "text", photos);
     setQueued(queuedCount());
     setToast(result === "saved" ? (FREE_MODE ? "Got it! Claude puts it in its place on the next hourly round. 🌈" : "Got it. I'll put it all in its place.") : "Saved on this device. I'll sync it when you're back online.");
-    box.current?.focus();
+    if (onSaved) setTimeout(onSaved, 1400);
+    else box.current?.focus();
   }
 
   return (
@@ -88,8 +90,9 @@ export function Capture() {
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void submit();
         }}
-        placeholder="What's on your mind? Dump it all here, messy is fine. اكتب أو اتكلم"
-        rows={3}
+        placeholder="Write, speak or paste… messy is fine. اكتب أو اتكلم"
+        rows={4}
+        autoFocus={autoFocus}
       />
       {images.length > 0 && (
         <div className="thumbs">
@@ -121,7 +124,7 @@ export function Capture() {
           <input ref={picker} type="file" accept="image/*" multiple hidden onChange={(e) => void addPhotos(e.target.files)} />
         </div>
         <button className="primary" onClick={() => void submit()} disabled={!text.trim() && !images.length}>
-          Dump it
+          Save
         </button>
       </div>
       {!speech.supported && <p className="hint">Tip: tap the 🎙 on your keyboard to talk instead of type.</p>}
