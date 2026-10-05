@@ -1,0 +1,8 @@
+# Free hosting on Netlify (keeps the GitHub repo private). Settings like the Supabase
+# address come from .env.production, written by supabase/functions/_here/setup.ts.
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"

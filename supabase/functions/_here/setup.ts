@@ -57,9 +57,10 @@ await run(["npx", "-y", "supabase@latest", "functions", "deploy", "--project-ref
 console.log("Deployed functions");
 
 // 4. Where the confirmation email's link goes: the app on GitHub Pages.
+// APP_URL is the Netlify address when hosting there; otherwise GitHub Pages.
 const remote = (await run(["git", "remote", "get-url", "origin"])).trim();
 const [, owner, repo] = remote.match(/github\.com[/:]([^/]+)\/([^/.]+)/) ?? [];
-const appUrl = `https://${owner.toLowerCase()}.github.io/${repo}/`;
+const appUrl = Deno.env.get("APP_URL")?.replace(/\/?$/, "/") ?? `https://${owner.toLowerCase()}.github.io/${repo}/`;
 await api(`/projects/${ref}/config/auth`, {
   method: "PATCH",
   body: JSON.stringify({ site_url: appUrl, uri_allow_list: `${appUrl}**` }),
