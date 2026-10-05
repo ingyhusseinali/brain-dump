@@ -18,6 +18,30 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // If the app can't start (an error, or a browser too old for it), say so on screen
+      // instead of leaving a blank page, so the message can be shared in a screenshot.
+      (function () {
+        function show(msg) {
+          var root = document.getElementById("root");
+          if (!root || root.childNodes.length) return;
+          root.innerHTML =
+            '<div style="font-family:system-ui,sans-serif;padding:32px 20px;max-width:520px;margin:auto">' +
+            "<h2>Brain Dump couldn't start</h2><p>Please send a screenshot of this to Claude.</p>" +
+            '<pre style="white-space:pre-wrap;font-size:12px;background:#eee;padding:12px;border-radius:8px"></pre></div>';
+          root.querySelector("pre").textContent = msg + "\n\n" + navigator.userAgent;
+        }
+        window.addEventListener("error", function (e) {
+          // Only our own scripts matter; a font that fails to load is fine.
+          if (e.target && e.target.tagName && e.target.tagName !== "SCRIPT") return;
+          show("Error: " + (e.message || (e.target && (e.target.src || e.target.href)) || "unknown"));
+        }, true);
+        window.addEventListener("unhandledrejection", function (e) {
+          show("Error: " + (e.reason && (e.reason.stack || e.reason.message) || e.reason));
+        });
+        setTimeout(function () { show("The app didn't load within 15 seconds."); }, 15000);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

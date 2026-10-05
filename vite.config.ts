@@ -6,5 +6,9 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   base: process.env.BASE_PATH ?? "/",
   plugins: [react()],
-  build: process.env.DEMO_SINGLE_FILE ? { rolldownOptions: { output: { inlineDynamicImports: true, format: "iife" } } } : {},
+  build: {
+    // Older iPhones (iOS 14+) too.
+    target: ["es2020", "safari14"],
+    ...(process.env.DEMO_SINGLE_FILE ? { rolldownOptions: { output: { inlineDynamicImports: true, format: "iife" } } } : {}),
+  },
 });
