@@ -92,6 +92,16 @@ export function useProfile(userId: string) {
     [cycles, load],
   );
 
+  /** Fixes a mis-tap: removes a logged period, or reopens one marked as ended by mistake. */
+  const undoPeriod = useCallback(
+    async (id: string, what: "remove" | "reopen") => {
+      if (what === "remove") await supabase.from("cycles").delete().eq("id", id);
+      else await supabase.from("cycles").update({ ended_on: null }).eq("id", id);
+      await load();
+    },
+    [load],
+  );
+
   /** Asks Claude what to cook today (again, if they want something else). */
   const suggestMeal = useCallback(async (): Promise<string | null> => {
     const { data, error } = await supabase.functions.invoke("suggest-meal", { body: { timezone: timeZone } });
@@ -101,5 +111,5 @@ export function useProfile(userId: string) {
     return data.meal.outputId as string;
   }, []);
 
-  return { profile, cycles, save, markQuranRead, logPeriod, suggestMeal };
+  return { profile, cycles, save, markQuranRead, logPeriod, undoPeriod, suggestMeal };
 }

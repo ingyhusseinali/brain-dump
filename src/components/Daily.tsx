@@ -29,7 +29,7 @@ const fmtTime = (d: Date) => d.toLocaleTimeString(undefined, { hour: "numeric", 
 
 /** Quran, prayer and cycle: small, calm cards that need one tap at most. */
 export function Daily({ state, outputs, onOpenOutput }: { state: ProfileState; outputs: Output[]; onOpenOutput: (id: string) => void }) {
-  const { profile, cycles, markQuranRead, logPeriod, suggestMeal } = state;
+  const { profile, cycles, markQuranRead, logPeriod, undoPeriod, suggestMeal } = state;
   const [, tick] = useState(0);
   const [thinking, setThinking] = useState(false);
   useEffect(() => {
@@ -47,6 +47,11 @@ export function Daily({ state, outputs, onOpenOutput }: { state: ProfileState; o
       ? nextPrayer(profile.latitude, profile.longitude)
       : null;
   const lastStart = cycles.find((c) => c.started_on <= today);
+  // A period marked as ended in the last two days can still be fixed from here.
+  const justEnded = !period && lastStart?.ended_on && daysBetween(lastStart.ended_on, today) <= 2 ? lastStart : null;
+  const remove = (id: string) => {
+    if (confirm("Remove this period? Use this if you tapped by mistake.")) void undoPeriod(id, "remove");
+  };
 
   return (
     <section className="daily" aria-label="Daily">
@@ -106,6 +111,15 @@ export function Daily({ state, outputs, onOpenOutput }: { state: ProfileState; o
                 <p className="daily-title">🤍 Period · day {lastStart ? daysBetween(lastStart.started_on, today) + 1 : 1}</p>
                 <p className="muted small">{profile.prayer_reminders ? "Prayer reminders are paused. Rest well." : "Rest well."}</p>
               </>
+            ) : justEnded ? (
+              <>
+                <p className="daily-title">🌸 Period logged</p>
+                <p className="muted small">
+                  {justEnded.started_on === justEnded.ended_on
+                    ? `Marked for ${fmtDay(justEnded.started_on)}. Tapped by mistake? You can remove it.`
+                    : `${fmtDay(justEnded.started_on)} to ${fmtDay(justEnded.ended_on!)}.`}
+                </p>
+              </>
             ) : window && today >= window.start && today <= window.end ? (
               <>
                 <p className="daily-title">🌸 Likely fertile days</p>
@@ -129,9 +143,31 @@ export function Daily({ state, outputs, onOpenOutput }: { state: ProfileState; o
           </div>
           <div className="daily-actions">
             {period ? (
-              <button className="pill" onClick={() => void logPeriod("end")}>
-                It ended
-              </button>
+              <>
+                <button className="pill" onClick={() => void logPeriod("end")}>
+                  It ended
+                </button>
+                {lastStart && (
+                  <button className="link small" onClick={() => remove(lastStart.id)}>
+                    Tapped by mistake
+                  </button>
+                )}
+              </>
+            ) : justEnded ? (
+              <>
+                {justEnded.started_on === justEnded.ended_on ? (
+                  <button className="pill" onClick={() => remove(justEnded.id)}>
+                    Tapped by mistake
+                  </button>
+                ) : (
+                  <button className="pill" onClick={() => void undoPeriod(justEnded.id, "reopen")}>
+                    Not over yet
+                  </button>
+                )}
+                <button className="link small" onClick={() => void logPeriod("start")}>
+                  Period started
+                </button>
+              </>
             ) : (
               <button className="pill" onClick={() => void logPeriod("start")}>
                 Period started

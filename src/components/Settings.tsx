@@ -10,6 +10,7 @@ const fromTime = (value: string) => {
 };
 const hours = Array.from({ length: 24 }, (_, h) => h);
 const hourLabel = (h: number) => new Date(2000, 0, 1, h).toLocaleTimeString(undefined, { hour: "numeric" });
+const fmtDay = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short" });
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function Toggle({ label, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }) {
@@ -280,6 +281,26 @@ export function Settings({ state, email }: { state: ReturnType<typeof useProfile
                 Fertile days are estimated from your logged periods and get more accurate over a few cycles. Ovulation tests or your doctor
                 can confirm them. Only you can see this data.
               </p>
+            )}
+            {profile.cycle_tracking && state.cycles.length > 0 && (
+              <ul className="cycle-log">
+                {state.cycles.map((c) => (
+                  <li key={c.id}>
+                    <span>
+                      {fmtDay(c.started_on)}
+                      {c.ended_on ? (c.ended_on === c.started_on ? "" : ` to ${fmtDay(c.ended_on)}`) : " (now)"}
+                    </span>
+                    <button
+                      className="pill quiet"
+                      onClick={() => {
+                        if (confirm("Remove this period?")) void state.undoPeriod(c.id, "remove");
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
             )}
           </section>
         </>

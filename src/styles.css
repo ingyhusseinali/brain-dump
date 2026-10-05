@@ -190,6 +190,7 @@ a.pill { text-decoration: none; display: inline-flex; align-items: center; color
 .inline-form { display: flex; gap: 8px; }
 .inline-form input { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .card input, .card select { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: inherit; font: inherit; }
+.card .toggle input { width: 24px; height: 24px; padding: 0; flex: none; }
 .card.is-done { border-color: var(--good); }
 
 /* Calendar */
@@ -519,3 +520,8 @@ h2 { font-size: 1.1rem; font-weight: 800; }
 .tabs button.is-on::after { display: none; }
 .tab-today, .tab-lists, .tab-calendar, .tab-more { --c: var(--accent); }
 .prio { display: inline-block; vertical-align: 2px; margin-right: 6px; padding: 1px 7px; border-radius: 999px; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--warn); background: color-mix(in srgb, var(--warn) 13%, transparent); }
+
+/* Logged periods in Settings, each removable. */
+.cycle-log { list-style: none; margin: 12px 0 0; padding: 0; }
+.cycle-log li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line, rgba(0,0,0,.08)); }
+.daily-actions .link.small { font-size: 0.8rem; }
